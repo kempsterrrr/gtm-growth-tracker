@@ -37,9 +37,27 @@ export function Sidebar() {
         collapsed ? "w-16" : "w-60"
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
         {!collapsed && (
-          <h1 className="text-lg font-bold tracking-tight">GTM Tracker</h1>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://ar.io/brand/ario-white.svg"
+              alt="ar.io"
+              className="h-6 w-6"
+            />
+            <span className="text-sm font-semibold tracking-tight">
+              Growth Tracker
+            </span>
+          </div>
+        )}
+        {collapsed && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src="https://ar.io/brand/ario-white.svg"
+            alt="ar.io"
+            className="h-5 w-5"
+          />
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}

@@ -32,12 +32,12 @@ export interface CreateEventInput {
 }
 
 export const EVENT_CATEGORY_COLORS: Record<EventCategory, string> = {
-  release: "#3b82f6",          // blue
+  release: "#5427C8",          // ar.io primary purple
   dependency_added: "#22c55e", // green
-  blog_post: "#a855f7",       // purple
+  blog_post: "#7C5CE7",       // lighter purple
   conference: "#f97316",      // orange
-  upstream_inclusion: "#ef4444", // red
-  custom: "#6b7280",          // gray
+  upstream_inclusion: "#A78BFA", // lavender purple
+  custom: "#6B6B78",          // muted
 };
 
 export const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {

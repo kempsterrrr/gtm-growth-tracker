@@ -3,8 +3,8 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 
 export const metadata: Metadata = {
-  title: "GTM Growth Tracker",
-  description: "Track adoption and growth of your open-source packages and repos",
+  title: "ar.io Growth Tracker",
+  description: "Track adoption and growth of ar.io open-source packages and repos",
 };
 
 export default function RootLayout({
