@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Besley:wght@800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Besley", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/*
+ * ar.io Brand Colors:
+ *   Primary:      #5427C8 (deep purple)
+ *   Lavender:     #DFD6F7 (light purple)
+ *   Black:        #23232D (near-black)
+ *   White:        #FFFFFF
+ *   Card Surface: #F0F0F0
+ */
+
+:root {
+  --radius: 0.625rem;
+  --background: #FFFFFF;
+  --foreground: #23232D;
+  --card: #F0F0F0;
+  --card-foreground: #23232D;
+  --popover: #FFFFFF;
+  --popover-foreground: #23232D;
+  --primary: #5427C8;
+  --primary-foreground: #FFFFFF;
+  --secondary: #DFD6F7;
+  --secondary-foreground: #23232D;
+  --muted: #F0F0F0;
+  --muted-foreground: #6B6B78;
+  --accent: #DFD6F7;
+  --accent-foreground: #23232D;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E5E5EA;
+  --input: #E5E5EA;
+  --ring: #5427C8;
+  --sidebar: #23232D;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-accent: #3A3A48;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #3A3A48;
+  /* Chart palette built around ar.io purple */
+  --chart-1: #5427C8;
+  --chart-2: #7C5CE7;
+  --chart-3: #A78BFA;
+  --chart-4: #DFD6F7;
+  --chart-5: #C084FC;
+}
+
+.dark {
+  --background: #23232D;
+  --foreground: #F0F0F0;
+  --card: #2E2E3A;
+  --card-foreground: #F0F0F0;
+  --popover: #2E2E3A;
+  --popover-foreground: #F0F0F0;
+  --primary: #7C5CE7;
+  --primary-foreground: #FFFFFF;
+  --secondary: #3A3A48;
+  --secondary-foreground: #F0F0F0;
+  --muted: #3A3A48;
+  --muted-foreground: #A0A0AE;
+  --accent: #3A3A48;
+  --accent-foreground: #F0F0F0;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #3A3A48;
+  --input: #3A3A48;
+  --ring: #7C5CE7;
+  --sidebar: #1A1A22;
+  --sidebar-foreground: #F0F0F0;
+  --sidebar-accent: #2E2E3A;
+  --sidebar-accent-foreground: #F0F0F0;
+  --sidebar-border: #2E2E3A;
+  --chart-1: #7C5CE7;
+  --chart-2: #A78BFA;
+  --chart-3: #C084FC;
+  --chart-4: #DFD6F7;
+  --chart-5: #5427C8;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+}
