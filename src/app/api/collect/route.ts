@@ -5,6 +5,13 @@ import { collectGithubMetrics } from "@/lib/collectors/github";
 import { collectPypiDownloads } from "@/lib/collectors/pypi";
 import { collectDependencies } from "@/lib/collectors/deps-dev";
 import { collectAutoEvents } from "@/lib/collectors/events-auto";
+import { collectGithubEngagement } from "@/lib/collectors/github-engagement";
+import { collectUserEnrichment } from "@/lib/collectors/github-user-enrichment";
+import { collectCommitEmails } from "@/lib/collectors/github-commit-emails";
+import { resolveCompanies } from "@/lib/collectors/company-resolution";
+import { scoreCompanies } from "@/lib/collectors/company-scoring";
+import { evaluateAlerts } from "@/lib/collectors/alerts-evaluator";
+import { sendAlertNotifications } from "@/lib/collectors/slack-notifier";
 
 export async function POST() {
   try {
@@ -12,39 +19,28 @@ export async function POST() {
 
     const results: string[] = [];
 
-    try {
-      await collectGithubMetrics();
-      results.push("GitHub metrics collected");
-    } catch (err) {
-      results.push(`GitHub error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    const collectors = [
+      { name: "GitHub metrics", fn: collectGithubMetrics },
+      { name: "npm downloads", fn: collectNpmDownloads },
+      { name: "PyPI downloads", fn: collectPypiDownloads },
+      { name: "Dependencies", fn: collectDependencies },
+      { name: "Auto events", fn: collectAutoEvents },
+      { name: "GitHub engagement", fn: collectGithubEngagement },
+      { name: "User enrichment", fn: () => collectUserEnrichment(50) },
+      { name: "Commit emails", fn: collectCommitEmails },
+      { name: "Company resolution", fn: resolveCompanies },
+      { name: "Company scoring", fn: scoreCompanies },
+      { name: "Alert evaluation", fn: evaluateAlerts },
+      { name: "Slack notifications", fn: sendAlertNotifications },
+    ];
 
-    try {
-      await collectNpmDownloads();
-      results.push("npm downloads collected");
-    } catch (err) {
-      results.push(`npm error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    try {
-      await collectPypiDownloads();
-      results.push("PyPI downloads collected");
-    } catch (err) {
-      results.push(`PyPI error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    try {
-      await collectDependencies();
-      results.push("Dependencies collected");
-    } catch (err) {
-      results.push(`Dependencies error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    try {
-      await collectAutoEvents();
-      results.push("Auto events collected");
-    } catch (err) {
-      results.push(`Events error: ${err instanceof Error ? err.message : String(err)}`);
+    for (const c of collectors) {
+      try {
+        await c.fn();
+        results.push(`${c.name}: OK`);
+      } catch (err) {
+        results.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     return NextResponse.json({

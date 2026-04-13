@@ -13,6 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Boxes,
+  Building2,
+  Bell,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -22,7 +24,9 @@ const navItems = [
   { href: "/npm", label: "npm", icon: Package },
   { href: "/pypi", label: "PyPI", icon: Boxes },
   { href: "/dependencies", label: "Dependencies", icon: GitFork },
+  { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/events", label: "Events", icon: Calendar },
+  { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
