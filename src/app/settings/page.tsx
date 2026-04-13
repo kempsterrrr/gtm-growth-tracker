@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Play, Loader2 } from "lucide-react";
+import { Plus, Play, Loader2, MessageSquare } from "lucide-react";
 
 interface TrackedRepo {
   id: number;
@@ -267,11 +267,14 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Slack Integration */}
+        <SlackConfigCard />
+
         {/* Data Collection */}
         <Card>
           <CardHeader>
             <CardTitle>Data Collection</CardTitle>
-            <CardDescription>Manually trigger data collection from all configured sources</CardDescription>
+            <CardDescription>Manually trigger data collection from all configured sources (includes sales intelligence pipeline)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -303,5 +306,105 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function SlackConfigCard() {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [channelName, setChannelName] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [configured, setConfigured] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/slack")
+      .then((r) => r.json())
+      .then((data: { configured: boolean; channelName: string; enabled: boolean }) => {
+        setConfigured(data.configured);
+        setChannelName(data.channelName);
+        setEnabled(data.enabled);
+      });
+  }, []);
+
+  async function saveSlack(e: React.FormEvent) {
+    e.preventDefault();
+    await fetch("/api/settings/slack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ webhookUrl: webhookUrl || undefined, channelName, enabled }),
+    });
+    setConfigured(!!webhookUrl);
+    setTestResult("Saved!");
+  }
+
+  async function testSlack() {
+    if (!webhookUrl) return;
+    setTesting(true);
+    const res = await fetch("/api/settings/slack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ test: true, webhookUrl }),
+    });
+    const data = await res.json();
+    setTestResult(data.success ? "Test message sent!" : "Failed to send test message");
+    setTesting(false);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5" />
+          <div>
+            <CardTitle>Slack Integration</CardTitle>
+            <CardDescription>Send sales signal alerts to a Slack channel</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={saveSlack} className="space-y-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">Webhook URL</label>
+            <input
+              type="password"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              placeholder={configured ? "••••••• (configured)" : "https://hooks.slack.com/services/..."}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Channel Name (optional)</label>
+            <input
+              type="text"
+              value={channelName}
+              onChange={(e) => setChannelName(e.target.value)}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              placeholder="#sales-signals"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="slack-enabled"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+              className="rounded"
+            />
+            <label htmlFor="slack-enabled" className="text-sm">Enable notifications</label>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">Save</Button>
+            <Button type="button" variant="outline" size="sm" onClick={testSlack} disabled={!webhookUrl || testing}>
+              {testing ? "Sending..." : "Test Connection"}
+            </Button>
+          </div>
+          {testResult && (
+            <p className="text-sm text-muted-foreground">{testResult}</p>
+          )}
+        </form>
+      </CardContent>
+    </Card>
   );
 }
