@@ -1,27 +1,23 @@
-# GTM Growth Tracker Configuration
-# Add your GitHub repos and packages to track below.
+# ar.io Growth Tracker Configuration
 
 github:
   repos:
-    # Example:
-    # - owner: "anthropics"
-    #   name: "anthropic-sdk-python"
-    #   display_name: "Python SDK"
-    []
+    - owner: "ardriveapp"
+      name: "turbo-sdk"
+      display_name: "Turbo SDK (JS/TS)"
+    - owner: "ardriveapp"
+      name: "turbo-python-sdk"
+      display_name: "Turbo SDK (Python)"
 
 packages:
   npm:
-    # Example:
-    # - name: "@anthropic-ai/sdk"
-    #   display_name: "Anthropic JS SDK"
-    #   github_repo: "anthropics/anthropic-sdk-typescript"
-    []
+    - name: "@ardrive/turbo-sdk"
+      display_name: "Turbo SDK"
+      github_repo: "ardriveapp/turbo-sdk"
   pypi:
-    # Example:
-    # - name: "anthropic"
-    #   display_name: "Anthropic Python SDK"
-    #   github_repo: "anthropics/anthropic-sdk-python"
-    []
+    - name: "turbo-sdk"
+      display_name: "Turbo SDK (Python)"
+      github_repo: "ardriveapp/turbo-python-sdk"
 
 collection:
   npm_backfill_from: "2024-01-01"
