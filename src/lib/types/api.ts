@@ -116,6 +116,7 @@ export interface TrackedRepoRow {
   owner: string;
   name: string;
   displayName: string | null;
+  competitor: string | null;
 }
 export interface TrackedPackageRow {
   id: number;
@@ -123,6 +124,7 @@ export interface TrackedPackageRow {
   name: string;
   displayName: string | null;
   repoId: number | null;
+  competitor: string | null;
 }
 export interface ConfigResponse {
   repos: TrackedRepoRow[];

@@ -52,6 +52,17 @@ the step with a path-named message). Package names are validated by
 module on every add and parse. The Settings page edits config through
 `src/app/api/config/route.ts`, a thin caller of the module.
 
+Repo and package entries accept an optional `competitor: <name>` (absent =
+our own); an optional top-level `competitors:` block maps name →
+`{ domains: [...] }` and is validated referentially on every parse — a block
+name no repo/package entry uses is rejected (entries without a block entry
+are fine). config-sync projects a nullable `competitor` column onto both
+tracked tables one-directionally (removing the field nulls the column).
+Dashboard guard: the metric list endpoints — and therefore the Overview
+totals derived from them — exclude competitor-attributed entities
+(`competitor IS NULL`); detail-by-id endpoints intentionally still serve them
+(the competitor compare overlay depends on this).
+
 ### Deployment & data lifecycle
 
 - The SQLite DB (`data/gtm-tracker.db`) is **committed to git**: the daily workflow (`.github/workflows/collect-daily.yml`) runs the collector at 6 AM UTC and pushes the updated DB. Expect upstream commits touching `data/`.

@@ -7,7 +7,7 @@ import {
   githubTrafficClones,
   githubTrafficViews,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   // If no repoId, return all repos with latest metrics
   if (!repoId) {
-    const repos = db.select().from(trackedRepos).all();
+    const repos = db.select().from(trackedRepos).where(isNull(trackedRepos.competitor)).all();
 
     const summaries: GithubRepoSummary[] = repos.map((repo) => {
       const latest = db

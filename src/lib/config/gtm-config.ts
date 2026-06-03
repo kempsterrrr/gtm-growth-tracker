@@ -33,6 +33,7 @@ const trackedRepoConfigSchema = z.object({
   owner: z.string().min(1),
   name: z.string().min(1),
   display_name: z.string().optional(),
+  competitor: z.string().min(1).optional(),
 });
 
 const trackedPackageConfigSchema = z.object({
@@ -42,6 +43,11 @@ const trackedPackageConfigSchema = z.object({
     .string()
     .regex(/^[^\s/]+\/[^\s/]+$/, 'must be "owner/name"')
     .optional(),
+  competitor: z.string().min(1).optional(),
+});
+
+const competitorDomainsSchema = z.object({
+  domains: z.array(z.string().min(1)).default([]),
 });
 
 export const gtmConfigSchema = z.object({
@@ -54,6 +60,7 @@ export const gtmConfigSchema = z.object({
       pypi: z.array(trackedPackageConfigSchema).default([]),
     })
     .default({ npm: [], pypi: [] }),
+  competitors: z.record(z.string().min(1), competitorDomainsSchema).optional(),
   collection: z.object({ npm_backfill_from: z.string().optional() }).optional(),
 });
 
@@ -97,6 +104,28 @@ export function readConfig(configPath = defaultConfigPath()): GtmConfig {
       }
     }
   }
+  // Referential integrity: every competitors-block entry must be used by at
+  // least one repo or package entry, so typos surface immediately instead of
+  // silently disabling employee tagging. Entries without a block are fine —
+  // tagging falls back to the org/commit signals.
+  if (config.competitors) {
+    const used = new Set<string>();
+    for (const repo of config.github.repos) {
+      if (repo.competitor) used.add(repo.competitor);
+    }
+    for (const registry of ["npm", "pypi"] as const) {
+      for (const pkg of config.packages[registry]) {
+        if (pkg.competitor) used.add(pkg.competitor);
+      }
+    }
+    for (const name of Object.keys(config.competitors)) {
+      if (!used.has(name)) {
+        throw new ConfigError(
+          `Invalid config in ${path.basename(configPath)}: competitors block declares "${name}" but no repo or package entry uses it`
+        );
+      }
+    }
+  }
   return config;
 }
 
@@ -117,6 +146,7 @@ export function addRepo(repo: TrackedRepoConfig, configPath = defaultConfigPath(
   );
   if (existing) {
     existing.display_name = parsed.data.display_name ?? existing.display_name;
+    existing.competitor = parsed.data.competitor ?? existing.competitor;
   } else {
     config.github.repos.push(parsed.data);
   }
@@ -144,6 +174,7 @@ export function addPackage(
   if (existing) {
     existing.display_name = parsed.data.display_name ?? existing.display_name;
     existing.github_repo = parsed.data.github_repo ?? existing.github_repo;
+    existing.competitor = parsed.data.competitor ?? existing.competitor;
   } else {
     list.push(parsed.data);
   }
@@ -164,10 +195,18 @@ export function syncToDatabase(configPath = defaultConfigPath()): void {
 
   for (const repo of config.github.repos) {
     db.insert(trackedRepos)
-      .values({ owner: repo.owner, name: repo.name, displayName: repo.display_name || null })
+      .values({
+        owner: repo.owner,
+        name: repo.name,
+        displayName: repo.display_name || null,
+        competitor: repo.competitor || null,
+      })
       .onConflictDoUpdate({
         target: [trackedRepos.owner, trackedRepos.name],
-        set: { displayName: sql`excluded.display_name` },
+        set: {
+          displayName: sql`excluded.display_name`,
+          competitor: sql`excluded.competitor`,
+        },
       })
       .run();
   }
@@ -185,12 +224,19 @@ export function syncToDatabase(configPath = defaultConfigPath()): void {
         if (repo) repoId = repo.id;
       }
       db.insert(trackedPackages)
-        .values({ registry, name: pkg.name, displayName: pkg.display_name || null, repoId })
+        .values({
+          registry,
+          name: pkg.name,
+          displayName: pkg.display_name || null,
+          repoId,
+          competitor: pkg.competitor || null,
+        })
         .onConflictDoUpdate({
           target: [trackedPackages.registry, trackedPackages.name],
           set: {
             displayName: sql`excluded.display_name`,
             repoId: repoId ? sql`${repoId}` : sql`repo_id`,
+            competitor: sql`excluded.competitor`,
           },
         })
         .run();

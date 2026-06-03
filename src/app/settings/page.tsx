@@ -19,11 +19,13 @@ export default function SettingsPage() {
   const [repoOwner, setRepoOwner] = useState("");
   const [repoName, setRepoName] = useState("");
   const [repoDisplayName, setRepoDisplayName] = useState("");
+  const [repoCompetitor, setRepoCompetitor] = useState("");
 
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [pkgRegistry, setPkgRegistry] = useState("npm");
   const [pkgName, setPkgName] = useState("");
   const [pkgDisplayName, setPkgDisplayName] = useState("");
+  const [pkgCompetitor, setPkgCompetitor] = useState("");
   const [pkgError, setPkgError] = useState<string | null>(null);
 
   async function fetchConfig() {
@@ -48,12 +50,14 @@ export default function SettingsPage() {
           owner: repoOwner,
           name: repoName,
           displayName: repoDisplayName || undefined,
+          competitor: repoCompetitor.trim() || undefined,
         },
       }),
     });
     setRepoOwner("");
     setRepoName("");
     setRepoDisplayName("");
+    setRepoCompetitor("");
     setShowRepoForm(false);
     fetchConfig();
   }
@@ -75,6 +79,7 @@ export default function SettingsPage() {
           registry: pkgRegistry,
           name: pkgName.trim(),
           displayName: pkgDisplayName || undefined,
+          competitor: pkgCompetitor.trim() || undefined,
         },
       }),
     });
@@ -85,6 +90,7 @@ export default function SettingsPage() {
     }
     setPkgName("");
     setPkgDisplayName("");
+    setPkgCompetitor("");
     setShowPkgForm(false);
     fetchConfig();
   }
@@ -160,6 +166,16 @@ export default function SettingsPage() {
                       placeholder="Claude Code"
                     />
                   </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Competitor (optional)</label>
+                    <input
+                      type="text"
+                      value={repoCompetitor}
+                      onChange={(e) => setRepoCompetitor(e.target.value)}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      placeholder="Acme"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" size="sm">Add</Button>
@@ -180,7 +196,14 @@ export default function SettingsPage() {
                         <span className="text-muted-foreground text-sm ml-2">({repo.displayName})</span>
                       )}
                     </div>
-                    <Badge variant="outline" className="text-xs">GitHub</Badge>
+                    <div className="flex items-center gap-2">
+                      {repo.competitor && (
+                        <Badge variant="secondary" className="text-xs">
+                          {repo.competitor}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">GitHub</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -244,6 +267,16 @@ export default function SettingsPage() {
                       placeholder="Anthropic JS SDK"
                     />
                   </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Competitor (optional)</label>
+                    <input
+                      type="text"
+                      value={pkgCompetitor}
+                      onChange={(e) => setPkgCompetitor(e.target.value)}
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      placeholder="Acme"
+                    />
+                  </div>
                 </div>
                 {pkgError && (
                   <p className="text-sm text-red-600" role="alert">{pkgError}</p>
@@ -277,7 +310,14 @@ export default function SettingsPage() {
                         <span className="text-muted-foreground text-sm ml-2">({pkg.displayName})</span>
                       )}
                     </div>
-                    <Badge variant="outline" className="text-xs">{pkg.registry}</Badge>
+                    <div className="flex items-center gap-2">
+                      {pkg.competitor && (
+                        <Badge variant="secondary" className="text-xs">
+                          {pkg.competitor}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">{pkg.registry}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
