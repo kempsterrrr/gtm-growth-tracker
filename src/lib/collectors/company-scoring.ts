@@ -1,15 +1,31 @@
+import fs from "fs";
+import path from "path";
 import { getDb } from "../db/client";
 import {
   companies, githubUserCompanies, githubEngagementEvents, companyScores, trackedRepos,
-  companyCompetitorSignals,
+  companyCompetitorSignals, githubUsers, trackedPackages,
 } from "../db/schema";
 import {
   ENGAGEMENT_WEIGHTS, COMPETITOR_ENGAGEMENT_WEIGHTS, BREADTH_BONUS_PER_USER, MAX_EVENTS_PER_TYPE,
   DEPENDS_ON_WEIGHT,
 } from "../types/scoring";
+import { readConfig } from "../config/gtm-config";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
 import { todayIso } from "../dates";
+
+/** Configured competitor domains, gracefully empty without a config file
+ *  (the config module stays the only YAML reader). */
+function loadCompetitorDomains(): string[] {
+  const configPath = path.join(process.cwd(), "gtm-config.yaml");
+  if (!fs.existsSync(configPath)) return [];
+  try {
+    const config = readConfig(configPath);
+    return Object.values(config.competitors ?? {}).flatMap((c) => c.domains);
+  } catch {
+    return []; // malformed config already failed config-sync; scoring degrades
+  }
+}
 
 type ScoreScope = "own" | "competitor";
 
@@ -32,6 +48,37 @@ export async function scoreCompanies() {
   const today = todayIso();
   const allCompanies = db.select().from(companies).all();
   const allRepos = db.select().from(trackedRepos).all();
+
+  // Tagged competitor employees: excluded from competitor-scope aggregation
+  // (their own-side engagement still counts — "competitor is watching us"
+  // stays visible; issue #23).
+  const taggedUserIds = new Set(
+    db
+      .select({ id: githubUsers.id })
+      .from(githubUsers)
+      .where(sql`${githubUsers.competitorEmployee} IS NOT NULL`)
+      .all()
+      .map((r) => r.id)
+  );
+
+  // The competitor's own company never ranks as its own prospect: identify it
+  // by tracked competitor name (case-insensitive) or configured domain.
+  const competitorNames = new Set(
+    allRepos
+      .map((r) => r.competitor)
+      .filter((c): c is string => c != null)
+      .map((c) => c.toLowerCase())
+  );
+  const competitorPkgs = db
+    .select({ competitor: trackedPackages.competitor })
+    .from(trackedPackages)
+    .where(sql`${trackedPackages.competitor} IS NOT NULL`)
+    .all();
+  for (const p of competitorPkgs) competitorNames.add(p.competitor!.toLowerCase());
+  const competitorDomains = new Set(loadCompetitorDomains());
+  const isCompetitorCompany = (company: { name: string; domain: string | null }) =>
+    competitorNames.has(company.name.toLowerCase()) ||
+    (company.domain != null && competitorDomains.has(company.domain));
 
   let scored = 0;
 
@@ -75,6 +122,8 @@ export async function scoreCompanies() {
       let repoStars = 0, repoForks = 0, repoIssues = 0, repoPrs = 0, repoCommits = 0;
 
       for (const userId of userIds) {
+        // Competitor employees never contribute to competitor-scope scores.
+        if (scope === "competitor" && taggedUserIds.has(userId)) continue;
         // Get engagement events for this user on this repo
         const events = db.select({
           eventType: githubEngagementEvents.eventType,
@@ -157,6 +206,9 @@ export async function scoreCompanies() {
       for (const scope of ["own", "competitor"] as const) {
         const t = totals[scope];
         if (t.score <= 0) continue;
+        // The competitor itself gets no competitor aggregate — it must never
+        // surface as its own prospect or battleground.
+        if (scope === "competitor" && isCompetitorCompany(company)) continue;
         db.insert(companyScores)
           .values({
             companyId: company.id, repoId: null, scope, date: today,
