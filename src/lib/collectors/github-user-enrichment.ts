@@ -1,23 +1,11 @@
 import { getDb } from "../db/client";
 import { githubUsers, githubUserEmails, githubUserOrgs, enrichmentQueue } from "../db/schema";
-import { getUserProfile, getUserOrgs, getRateLimit } from "../api-clients/github-users-client";
+import { createGithubClient, type GithubClient } from "../api-clients/github-client";
 import { extractDomain, isFreemailDomain } from "../utils/domain";
 import { sql } from "drizzle-orm";
 
-export async function collectUserEnrichment(batchSize = 50) {
+export async function collectUserEnrichment(batchSize = 50, client: GithubClient = createGithubClient()) {
   const db = getDb();
-
-  const rateLimit = await getRateLimit();
-  const needed = batchSize * 3;
-  if (rateLimit.remaining < needed) {
-    const adjusted = Math.floor(rateLimit.remaining / 3);
-    if (adjusted < 5) {
-      console.log(`[enrichment] Rate limit too low (${rateLimit.remaining}), skipping`);
-      return;
-    }
-    batchSize = adjusted;
-    console.log(`[enrichment] Reduced batch to ${batchSize} due to rate limit`);
-  }
 
   const pending = db.select().from(enrichmentQueue)
     .where(sql`${enrichmentQueue.status} = 'pending'`)
@@ -42,7 +30,7 @@ export async function collectUserEnrichment(batchSize = 50) {
         .run();
 
       // Fetch profile
-      const profile = await getUserProfile(item.userLogin);
+      const profile = await client.getUserProfile(item.userLogin);
 
       db.update(githubUsers)
         .set({
@@ -76,7 +64,7 @@ export async function collectUserEnrichment(batchSize = 50) {
 
       // Fetch orgs
       try {
-        const orgs = await getUserOrgs(item.userLogin);
+        const orgs = await client.getUserOrgs(item.userLogin);
         const user = db.select().from(githubUsers).where(sql`${githubUsers.login} = ${item.userLogin}`).get();
         if (user) {
           for (const org of orgs) {

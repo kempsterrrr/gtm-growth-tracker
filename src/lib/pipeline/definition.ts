@@ -13,14 +13,6 @@ import { evaluateAlerts } from "../collectors/alerts-evaluator";
 import { sendAlertNotifications } from "../collectors/slack-notifier";
 import type { PipelineStep } from "./runner";
 
-/** GitHub API steps fail fast (recorded as `failed`, dependents `skipped`)
- *  instead of limping along unauthenticated at 60 requests/hour. */
-function requireGithubToken() {
-  if (!process.env.GITHUB_TOKEN) {
-    throw new Error("GITHUB_TOKEN is not set — GitHub collection cannot run");
-  }
-}
-
 /**
  * The single registry of collection steps. Both the CLI run
  * (src/scripts/collect-all.ts) and the manual trigger
@@ -32,43 +24,20 @@ function requireGithubToken() {
 export const pipelineSteps: PipelineStep[] = [
   { name: "config-sync", dependsOn: [], run: async () => syncConfig() },
 
-  // Metric collectors — independent of each other
-  {
-    name: "github",
-    dependsOn: ["config-sync"],
-    run: async () => {
-      requireGithubToken();
-      await collectGithubMetrics();
-    },
-  },
+  // Metric collectors — independent of each other. GitHub steps fail fast with
+  // a typed GithubAuthError from createGithubClient() when GITHUB_TOKEN is unset.
+  { name: "github", dependsOn: ["config-sync"], run: () => collectGithubMetrics() },
   { name: "npm", dependsOn: ["config-sync"], run: () => collectNpmDownloads() },
   { name: "pypi", dependsOn: ["config-sync"], run: () => collectPypiDownloads() },
   { name: "deps-dev", dependsOn: ["config-sync"], run: () => collectDependencies() },
-  {
-    name: "events-auto",
-    dependsOn: ["config-sync"],
-    run: async () => {
-      requireGithubToken();
-      await collectAutoEvents();
-    },
-  },
+  { name: "events-auto", dependsOn: ["config-sync"], run: () => collectAutoEvents() },
 
   // Sales-intelligence chain — linear
-  {
-    name: "github-engagement",
-    dependsOn: ["config-sync"],
-    run: async () => {
-      requireGithubToken();
-      await collectGithubEngagement();
-    },
-  },
+  { name: "github-engagement", dependsOn: ["config-sync"], run: () => collectGithubEngagement() },
   {
     name: "github-user-enrichment",
     dependsOn: ["github-engagement"],
-    run: async () => {
-      requireGithubToken();
-      await collectUserEnrichment(50);
-    },
+    run: () => collectUserEnrichment(50),
   },
   {
     name: "github-commit-emails",
