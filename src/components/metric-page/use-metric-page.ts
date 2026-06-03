@@ -120,6 +120,7 @@ export function useMetricPage<E extends { id: number }, D>(config: MetricPageCon
     setDateRange,
     persona,
     setPersona,
+    buildQueryString,
   };
 }
 

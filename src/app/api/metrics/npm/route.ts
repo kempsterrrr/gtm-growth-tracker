@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { npmDownloads, trackedPackages } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, desc, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, isNull, isNotNull } from "drizzle-orm";
 import { daysAgoIso, growthPercent } from "@/lib/dates";
-import type { NpmPackageSummary, DownloadRow } from "@/lib/types/api";
+import type { NpmPackageSummary, DownloadRow, CompetitorEntitySummary } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -12,6 +12,22 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate");
 
   const db = getDb();
+
+  // Opt-in compare view: competitor-attributed packages with their label.
+  if (!packageId && searchParams.get("competitors") === "1") {
+    const rows = db
+      .select()
+      .from(trackedPackages)
+      .where(and(eq(trackedPackages.registry, "npm"), isNotNull(trackedPackages.competitor)))
+      .all();
+    const payload: CompetitorEntitySummary[] = rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      displayName: p.displayName,
+      competitor: p.competitor!,
+    }));
+    return NextResponse.json(payload);
+  }
 
   // If no packageId, return all packages with summary
   if (!packageId) {

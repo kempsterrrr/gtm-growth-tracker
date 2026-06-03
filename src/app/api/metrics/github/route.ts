@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
-import type { GithubRepoSummary, GithubRepoMetricsResponse } from "@/lib/types/api";
+import type {
+  GithubRepoSummary,
+  GithubRepoMetricsResponse,
+  CompetitorEntitySummary,
+} from "@/lib/types/api";
 import {
   trackedRepos,
   githubRepoMetrics,
   githubTrafficClones,
   githubTrafficViews,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, desc, isNull, isNotNull } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -17,6 +21,18 @@ export async function GET(request: NextRequest) {
   const metric = searchParams.get("metric"); // "stars" | "traffic" | "all"
 
   const db = getDb();
+
+  // Opt-in compare view: competitor-attributed repos with their label.
+  if (!repoId && searchParams.get("competitors") === "1") {
+    const rows = db.select().from(trackedRepos).where(isNotNull(trackedRepos.competitor)).all();
+    const payload: CompetitorEntitySummary[] = rows.map((r) => ({
+      id: r.id,
+      name: `${r.owner}/${r.name}`,
+      displayName: r.displayName,
+      competitor: r.competitor!,
+    }));
+    return NextResponse.json(payload);
+  }
 
   // If no repoId, return all repos with latest metrics
   if (!repoId) {
