@@ -1,203 +1,155 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Header } from "@/components/layout/Header";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { Select } from "@/components/ui/select";
-import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
+import { useMetricPage, type MetricPageConfig } from "@/components/metric-page/use-metric-page";
+import { MetricPageShell, EmptyNotice } from "@/components/metric-page/MetricPageShell";
 import { Star, GitFork, Eye, CircleDot, Users } from "lucide-react";
-import type { EventCategory } from "@/lib/types/events";
-import type { GithubRepoSummary, GithubMetricRow, TrafficRow, TrackedEvent } from "@/lib/types/api";
+import type {
+  GithubRepoSummary,
+  GithubRepoMetricsResponse,
+  GithubMetricRow,
+  TrafficRow,
+  TrackedEvent,
+} from "@/lib/types/api";
+
+interface GithubDetail {
+  metrics: GithubMetricRow[];
+  clones: TrafficRow[];
+  views: TrafficRow[];
+  events: TrackedEvent[];
+}
+
+const CONFIG: MetricPageConfig<GithubDetail> = {
+  listUrl: "/api/metrics/github",
+  detailUrls: (id, qs) => [
+    `/api/metrics/github?${qs({ repoId: id, metric: "all" })}`,
+    `/api/events?${qs({ repoId: id })}`,
+  ],
+  combineDetail: ([data, events]) => {
+    const d = data as GithubRepoMetricsResponse;
+    return {
+      metrics: d.metrics ?? [],
+      clones: d.clones ?? [],
+      views: d.views ?? [],
+      events: events as TrackedEvent[],
+    };
+  },
+};
 
 export default function GithubPage() {
-  const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
-    useDashboardFilters();
+  const page = useMetricPage<GithubRepoSummary, GithubDetail>(CONFIG);
 
-  const [repos, setRepos] = useState<GithubRepoSummary[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState("");
-  const [metricsData, setMetricsData] = useState<GithubMetricRow[]>([]);
-  const [clonesData, setClonesData] = useState<TrafficRow[]>([]);
-  const [viewsData, setViewsData] = useState<TrafficRow[]>([]);
-  const [events, setEvents] = useState<TrackedEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const showMarketing =
+    page.persona === "all" || page.persona === "marketing" || page.persona === "gtm";
+  const showEngineering =
+    page.persona === "all" || page.persona === "engineering" || page.persona === "gtm";
 
-  useEffect(() => {
-    fetch("/api/metrics/github")
-      .then((r) => r.json())
-      .then((data: GithubRepoSummary[]) => {
-        setRepos(data);
-        if (data.length > 0 && !selectedRepo) {
-          setSelectedRepo(String(data[0].id));
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!selectedRepo) return;
-    setLoading(true);
-
-    const qs = buildQueryString({ repoId: selectedRepo, metric: "all" });
-
-    Promise.all([
-      fetch(`/api/metrics/github?${qs}`).then((r) => r.json()),
-      fetch(`/api/events?${buildQueryString({ repoId: selectedRepo })}`).then((r) =>
-        r.json()
-      ),
-    ])
-      .then(([data, evts]: [{ metrics?: GithubMetricRow[]; clones?: TrafficRow[]; views?: TrafficRow[] }, TrackedEvent[]]) => {
-        setMetricsData(data.metrics || []);
-        setClonesData(data.clones || []);
-        setViewsData(data.views || []);
-        setEvents(evts);
-      })
-      .finally(() => setLoading(false));
-  }, [selectedRepo, dateRange, buildQueryString]);
-
-  const currentRepo = repos.find((r) => String(r.id) === selectedRepo);
-
-  const showMarketing = persona === "all" || persona === "marketing" || persona === "gtm";
-  const showEngineering = persona === "all" || persona === "engineering" || persona === "gtm";
+  const metricsData = page.detail?.metrics ?? [];
+  const clonesData = page.detail?.clones ?? [];
+  const viewsData = page.detail?.views ?? [];
 
   return (
-    <div className="flex flex-col h-full">
-      <Header
-        title="GitHub Metrics"
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        persona={persona}
-        onPersonaChange={(p) => setPersona(p as typeof persona)}
-      />
-
-      <div className="flex-1 p-6 space-y-6">
-        {repos.length > 0 && (
-          <Select
-            options={repos.map((r) => ({
-              value: String(r.id),
-              label: r.displayName || `${r.owner}/${r.name}`,
+    <MetricPageShell
+      title="GitHub Metrics"
+      dateRange={page.dateRange}
+      onDateRangeChange={page.setDateRange}
+      persona={page.persona}
+      onPersonaChange={(p) => page.setPersona(p as typeof page.persona)}
+      entities={page.entities}
+      selected={page.selected}
+      onSelect={page.setSelected}
+      entityLabel={(r) => r.displayName || `${r.owner}/${r.name}`}
+      status={page.status}
+      error={page.error}
+      onRetry={page.retry}
+      emptyMessage="No repos tracked yet. Add repos in Settings."
+      cardColumns={5}
+      cards={
+        page.current
+          ? [
+              {
+                title: "Stars",
+                value: page.current.stars,
+                icon: <Star className="h-4 w-4" />,
+                show: showMarketing,
+              },
+              {
+                title: "Forks",
+                value: page.current.forks,
+                icon: <GitFork className="h-4 w-4" />,
+                show: showMarketing,
+              },
+              {
+                title: "Watchers",
+                value: page.current.watchers,
+                icon: <Eye className="h-4 w-4" />,
+                show: showEngineering,
+              },
+              {
+                title: "Open Issues",
+                value: page.current.openIssues,
+                icon: <CircleDot className="h-4 w-4" />,
+                show: showEngineering,
+              },
+              {
+                title: "Contributors",
+                value: page.current.contributors,
+                icon: <Users className="h-4 w-4" />,
+                show: showEngineering,
+              },
+            ]
+          : []
+      }
+    >
+      {metricsData.length > 0 && showMarketing && (
+        <div className="border rounded-lg p-4">
+          <h3 className="text-sm font-medium text-muted-foreground mb-4">Stars Over Time</h3>
+          <TimeSeriesChart
+            data={metricsData.map((d) => ({
+              date: d.date,
+              stars: d.stars ?? 0,
+              forks: d.forks ?? 0,
             }))}
-            value={selectedRepo}
-            onChange={(e) => setSelectedRepo(e.target.value)}
-            className="w-64"
+            metrics={[
+              { key: "stars", label: "Stars", color: "var(--chart-1)", type: "line" },
+              { key: "forks", label: "Forks", color: "var(--chart-2)", type: "line" },
+            ]}
+            events={page.detail?.events}
+            height={350}
           />
-        )}
+        </div>
+      )}
 
-        {currentRepo && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {showMarketing && (
-              <>
-                <MetricCard
-                  title="Stars"
-                  value={currentRepo.stars}
-                  icon={<Star className="h-4 w-4" />}
-                />
-                <MetricCard
-                  title="Forks"
-                  value={currentRepo.forks}
-                  icon={<GitFork className="h-4 w-4" />}
-                />
-              </>
-            )}
-            {showEngineering && (
-              <>
-                <MetricCard
-                  title="Watchers"
-                  value={currentRepo.watchers}
-                  icon={<Eye className="h-4 w-4" />}
-                />
-                <MetricCard
-                  title="Open Issues"
-                  value={currentRepo.openIssues}
-                  icon={<CircleDot className="h-4 w-4" />}
-                />
-                <MetricCard
-                  title="Contributors"
-                  value={currentRepo.contributors}
-                  icon={<Users className="h-4 w-4" />}
-                />
-              </>
-            )}
-          </div>
-        )}
-
-        {!loading && metricsData.length > 0 && showMarketing && (
+      {clonesData.length > 0 && showEngineering && (
+        <div className="grid md:grid-cols-2 gap-4">
           <div className="border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-4">
-              Stars Over Time
-            </h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">Clones</h3>
             <TimeSeriesChart
-              data={metricsData.map((d) => ({
-                date: d.date,
-                stars: d.stars ?? 0,
-                forks: d.forks ?? 0,
-              }))}
+              data={clonesData.map((d) => ({ date: d.date, total: d.total, unique: d.unique }))}
               metrics={[
-                { key: "stars", label: "Stars", color: "var(--chart-1)", type: "line" },
-                { key: "forks", label: "Forks", color: "var(--chart-2)", type: "line" },
+                { key: "total", label: "Total", color: "var(--chart-3)", type: "bar" },
+                { key: "unique", label: "Unique", color: "var(--chart-4)", type: "line" },
               ]}
-              events={events}
-              height={350}
+              height={250}
             />
           </div>
-        )}
-
-        {!loading && clonesData.length > 0 && showEngineering && (
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="border rounded-lg p-4">
-              <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                Clones
-              </h3>
-              <TimeSeriesChart
-                data={clonesData.map((d) => ({
-                  date: d.date,
-                  total: d.total,
-                  unique: d.unique,
-                }))}
-                metrics={[
-                  { key: "total", label: "Total", color: "var(--chart-3)", type: "bar" },
-                  { key: "unique", label: "Unique", color: "var(--chart-4)", type: "line" },
-                ]}
-                height={250}
-              />
-            </div>
-            <div className="border rounded-lg p-4">
-              <h3 className="text-sm font-medium text-muted-foreground mb-4">
-                Views
-              </h3>
-              <TimeSeriesChart
-                data={viewsData.map((d) => ({
-                  date: d.date,
-                  total: d.total,
-                  unique: d.unique,
-                }))}
-                metrics={[
-                  { key: "total", label: "Total", color: "var(--chart-3)", type: "bar" },
-                  { key: "unique", label: "Unique", color: "var(--chart-4)", type: "line" },
-                ]}
-                height={250}
-              />
-            </div>
+          <div className="border rounded-lg p-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">Views</h3>
+            <TimeSeriesChart
+              data={viewsData.map((d) => ({ date: d.date, total: d.total, unique: d.unique }))}
+              metrics={[
+                { key: "total", label: "Total", color: "var(--chart-3)", type: "bar" },
+                { key: "unique", label: "Unique", color: "var(--chart-4)", type: "line" },
+              ]}
+              height={250}
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        {!loading && metricsData.length === 0 && repos.length > 0 && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            No GitHub metrics available. Run the data collector first.
-          </div>
-        )}
-
-        {repos.length === 0 && !loading && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            No repos tracked yet. Add repos in Settings.
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            Loading...
-          </div>
-        )}
-      </div>
-    </div>
+      {metricsData.length === 0 && (
+        <EmptyNotice message="No GitHub metrics available. Run the data collector first." />
+      )}
+    </MetricPageShell>
   );
 }

@@ -3,66 +3,74 @@
 import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { MetricCard } from "@/components/charts/MetricCard";
-import { SparklineCard } from "@/components/charts/SparklineCard";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
+import { Button } from "@/components/ui/button";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
+import { fetchJson } from "@/components/metric-page/use-metric-page";
 import { Star, Download, GitFork, Package } from "lucide-react";
-import type { EventCategory } from "@/lib/types/events";
-import type { NpmPackageSummary, GithubRepoSummary, DependencySummary, DownloadRow, TrackedEvent } from "@/lib/types/api";
+import type {
+  NpmPackageSummary,
+  GithubRepoSummary,
+  DependencySummary,
+  DownloadRow,
+  TrackedEvent,
+} from "@/lib/types/api";
+
+interface OverviewData {
+  npmPackages: NpmPackageSummary[];
+  githubRepos: GithubRepoSummary[];
+  depSummaries: DependencySummary[];
+  events: TrackedEvent[];
+  chartData: Array<{ date: string; downloads: number }>;
+}
 
 export default function OverviewPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [npmPackages, setNpmPackages] = useState<NpmPackageSummary[]>([]);
-  const [githubRepos, setGithubRepos] = useState<GithubRepoSummary[]>([]);
-  const [depSummaries, setDepSummaries] = useState<DependencySummary[]>([]);
-  const [chartData, setChartData] = useState<Record<string, string | number>[]>([]);
-  const [events, setEvents] = useState<TrackedEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Keyed on the date range so stale responses are ignored and loading is
+  // derived — no synchronous setState inside the effect.
+  const [data, setData] = useState<{ key: string; value: OverviewData } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
+    let cancelled = false;
+    const key = dateRange;
+    (async () => {
       try {
-        const [npmRes, ghRes, depRes, eventsRes] = await Promise.all([
-          fetch("/api/metrics/npm"),
-          fetch("/api/metrics/github"),
-          fetch("/api/metrics/dependencies"),
-          fetch(`/api/events?${buildQueryString()}`),
+        const [npmPackages, githubRepos, depSummaries, events] = await Promise.all([
+          fetchJson<NpmPackageSummary[]>("/api/metrics/npm"),
+          fetchJson<GithubRepoSummary[]>("/api/metrics/github"),
+          fetchJson<DependencySummary[]>("/api/metrics/dependencies"),
+          fetchJson<TrackedEvent[]>(`/api/events?${buildQueryString()}`),
         ]);
 
-        const npmData: NpmPackageSummary[] = await npmRes.json();
-        const ghData: GithubRepoSummary[] = await ghRes.json();
-        const depData: DependencySummary[] = await depRes.json();
-        const eventsData: TrackedEvent[] = await eventsRes.json();
-
-        setNpmPackages(npmData);
-        setGithubRepos(ghData);
-        setDepSummaries(depData);
-        setEvents(eventsData);
-
-        // If there are npm packages, fetch chart data for the first one
-        if (npmData.length > 0) {
-          const qs = buildQueryString({ packageId: String(npmData[0].id) });
-          const chartRes = await fetch(`/api/metrics/npm?${qs}`);
-          const raw: DownloadRow[] = await chartRes.json();
-          setChartData(
-            raw.map((d) => ({
-              date: d.date,
-              downloads: d.downloads,
-            }))
-          );
+        let chartData: Array<{ date: string; downloads: number }> = [];
+        if (npmPackages.length > 0) {
+          const qs = buildQueryString({ packageId: String(npmPackages[0].id) });
+          const raw = await fetchJson<DownloadRow[]>(`/api/metrics/npm?${qs}`);
+          chartData = raw.map((d) => ({ date: d.date, downloads: d.downloads }));
         }
-      } catch (err) {
-        console.error("Failed to fetch overview data:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
 
-    fetchData();
-  }, [dateRange, buildQueryString]);
+        if (!cancelled) {
+          setData({ key, value: { npmPackages, githubRepos, depSummaries, events, chartData } });
+        }
+      } catch (err: unknown) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange, buildQueryString, retryToken]);
+
+  const current = data && data.key === dateRange ? data.value : null;
+  const loading = !error && current === null;
+
+  const npmPackages = current?.npmPackages ?? [];
+  const githubRepos = current?.githubRepos ?? [];
+  const depSummaries = current?.depSummaries ?? [];
 
   const totalStars = githubRepos.reduce((s, r) => s + r.stars, 0);
   const totalForks = githubRepos.reduce((s, r) => s + r.forks, 0);
@@ -88,13 +96,29 @@ export default function OverviewPage() {
       />
 
       <div className="flex-1 p-6 space-y-6">
+        {error && (
+          <div className="flex flex-col items-center justify-center h-48 gap-3">
+            <p className="text-sm text-destructive">Failed to load data: {error}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setRetryToken((t) => t + 1);
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
         {loading && (
           <div className="flex items-center justify-center h-48 text-muted-foreground">
             Loading metrics...
           </div>
         )}
 
-        {!loading && npmPackages.length === 0 && githubRepos.length === 0 && (
+        {current && npmPackages.length === 0 && githubRepos.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No packages tracked yet</h3>
@@ -105,7 +129,7 @@ export default function OverviewPage() {
           </div>
         )}
 
-        {!loading && (npmPackages.length > 0 || githubRepos.length > 0) && (
+        {current && (npmPackages.length > 0 || githubRepos.length > 0) && (
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -142,7 +166,7 @@ export default function OverviewPage() {
             </div>
 
             {/* Main Chart */}
-            {chartData.length > 0 && (
+            {current.chartData.length > 0 && (
               <div className="border rounded-lg p-4">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4">
                   Downloads Over Time
@@ -150,7 +174,7 @@ export default function OverviewPage() {
                     ` - ${npmPackages[0].displayName || npmPackages[0].name}`}
                 </h3>
                 <TimeSeriesChart
-                  data={chartData}
+                  data={current.chartData}
                   metrics={[
                     {
                       key: "downloads",
@@ -159,12 +183,12 @@ export default function OverviewPage() {
                       type: "area",
                     },
                   ]}
-                  events={events}
+                  events={current.events}
                 />
               </div>
             )}
 
-            {/* Sparkline Cards */}
+            {/* Package Overview (the dead empty-sparkline path is gone) */}
             {npmPackages.length > 1 && (
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">
@@ -172,11 +196,10 @@ export default function OverviewPage() {
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {npmPackages.map((pkg) => (
-                    <SparklineCard
+                    <MetricCard
                       key={pkg.id}
                       title={pkg.displayName || pkg.name}
                       value={`${pkg.downloadsLast7d.toLocaleString()} / week`}
-                      data={[]}
                     />
                   ))}
                 </div>
