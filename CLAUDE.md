@@ -79,7 +79,15 @@ competitor engagement. The Companies UI derives its filter/sort/phrasing in
 plus depends-on rows from `company_competitor_signals` (one row per
 company × competitor package × dependent; written by
 `resolve-competitor-dependents`, scored at `DEPENDS_ON_WEIGHT`, capped per
-package like engagement types).
+package like engagement types). Competitor employees are tagged on
+`github_users` (`competitor_employee` + source: commit_activity /
+org_membership / domain_match) by `tagCompetitorEmployees`, which runs at
+the END of company-resolution (not a pipeline step); tagging is additive
+(set once, never overwritten/deleted). Tagged users are excluded from
+competitor-scope aggregation only (own-side engagement stays visible,
+badged in the UI), and the competitor's own company (tracked name or
+configured domain match) never gets a competitor aggregate — it can't rank
+as its own prospect.
 
 ### Deployment & data lifecycle
 
