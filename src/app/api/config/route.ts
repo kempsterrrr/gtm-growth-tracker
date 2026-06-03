@@ -4,8 +4,11 @@ import { trackedRepos, trackedPackages } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
-import { parse, stringify } from "yaml";
+import { stringify } from "yaml";
 import type { GtmConfig } from "@/lib/types/config";
+import { validatePackageName } from "@/lib/validation/package-name";
+
+const YAML_HEADER = "# ar.io Growth Tracker Configuration\n\n";
 
 export async function GET() {
   const db = getDb();
@@ -43,11 +46,16 @@ export async function POST(request: NextRequest) {
   }
 
   if (type === "package") {
+    const validationError = validatePackageName(data.registry, data.name ?? "");
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
     const result = db
       .insert(trackedPackages)
       .values({
         registry: data.registry,
-        name: data.name,
+        name: data.name.trim(),
         displayName: data.displayName || null,
         repoId: data.repoId || null,
       })
@@ -74,6 +82,17 @@ function updateYamlConfig() {
   const repos = db.select().from(trackedRepos).all();
   const packages = db.select().from(trackedPackages).all();
 
+  const repoById = new Map(repos.map((r) => [r.id, `${r.owner}/${r.name}`]));
+
+  const toPackageEntry = (p: typeof packages[number]) => {
+    const githubRepo = p.repoId ? repoById.get(p.repoId) : undefined;
+    return {
+      name: p.name,
+      display_name: p.displayName || undefined,
+      github_repo: githubRepo,
+    };
+  };
+
   const config: GtmConfig = {
     github: {
       repos: repos.map((r) => ({
@@ -83,18 +102,8 @@ function updateYamlConfig() {
       })),
     },
     packages: {
-      npm: packages
-        .filter((p) => p.registry === "npm")
-        .map((p) => ({
-          name: p.name,
-          display_name: p.displayName || undefined,
-        })),
-      pypi: packages
-        .filter((p) => p.registry === "pypi")
-        .map((p) => ({
-          name: p.name,
-          display_name: p.displayName || undefined,
-        })),
+      npm: packages.filter((p) => p.registry === "npm").map(toPackageEntry),
+      pypi: packages.filter((p) => p.registry === "pypi").map(toPackageEntry),
     },
     collection: {
       npm_backfill_from: "2024-01-01",
@@ -102,5 +111,5 @@ function updateYamlConfig() {
   };
 
   const configPath = path.join(process.cwd(), "gtm-config.yaml");
-  fs.writeFileSync(configPath, stringify(config));
+  fs.writeFileSync(configPath, YAML_HEADER + stringify(config));
 }
