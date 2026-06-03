@@ -12,6 +12,7 @@ export const trackedRepos = sqliteTable(
     owner: text("owner").notNull(),
     name: text("name").notNull(),
     displayName: text("display_name"),
+    competitor: text("competitor"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`(datetime('now'))`),
@@ -27,6 +28,7 @@ export const trackedPackages = sqliteTable(
     name: text("name").notNull(),
     repoId: integer("repo_id").references(() => trackedRepos.id),
     displayName: text("display_name"),
+    competitor: text("competitor"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`(datetime('now'))`),

@@ -390,18 +390,42 @@ function rowCounts(db: Db): Record<string, number> {
   return counts;
 }
 
-describe("schema equivalence (cutover gate)", () => {
-  it("generated migrations produce a schema identical to the legacy hand-written SQL", () => {
-    const legacyDb = new Database(path.join(tmp, "legacy.db"));
+describe("schema equivalence (upgrade-path gate)", () => {
+  // The original cutover gate compared a fresh generated DB against the
+  // frozen legacy DDL — impossible to satisfy once post-cutover migrations
+  // exist. The evolved gate asserts both provisioning paths converge: a
+  // legacy pre-cutover DB upgraded by the migrator (idempotent baseline +
+  // later migrations) must equal a freshly migrated DB.
+  it("a legacy DB upgraded by the migrator matches a fresh generated DB", () => {
+    const legacyPath = path.join(tmp, "legacy.db");
+    const legacyDb = new Database(legacyPath);
     legacyDb.exec(LEGACY_SCHEMA_SQL);
-
-    process.env.DATABASE_PATH = path.join(tmp, "generated.db");
-    runMigrations();
-    const genDb = new Database(process.env.DATABASE_PATH);
-
-    expect(snapshot(genDb)).toEqual(snapshot(legacyDb));
     legacyDb.close();
+    process.env.DATABASE_PATH = legacyPath;
+    runMigrations();
+
+    const genPath = path.join(tmp, "generated.db");
+    process.env.DATABASE_PATH = genPath;
+    runMigrations();
+
+    const upgradedDb = new Database(legacyPath);
+    const genDb = new Database(genPath);
+    expect(snapshot(genDb)).toEqual(snapshot(upgradedDb));
     genDb.close();
+    upgradedDb.close();
+  });
+
+  it("the migrations add the nullable competitor attribution columns", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "columns.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const competitorCol = (table: string) =>
+      (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string; notnull: number }>)
+        .filter((c) => c.name === "competitor")
+        .map((c) => ({ name: c.name, notnull: c.notnull }));
+    expect(competitorCol("tracked_repos")).toEqual([{ name: "competitor", notnull: 0 }]);
+    expect(competitorCol("tracked_packages")).toEqual([{ name: "competitor", notnull: 0 }]);
+    db.close();
   });
 });
 
