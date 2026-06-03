@@ -382,3 +382,26 @@ export const collectionCursors = sqliteTable(
   },
   (table) => [uniqueIndex("collection_cursors_unique").on(table.cursorType, table.repoId)]
 );
+
+export const pipelineRuns = sqliteTable("pipeline_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  status: text("status", { enum: ["running", "success", "failed"] }).notNull(),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+});
+
+export const pipelineRunSteps = sqliteTable(
+  "pipeline_run_steps",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: integer("run_id")
+      .notNull()
+      .references(() => pipelineRuns.id),
+    stepName: text("step_name").notNull(),
+    status: text("status", { enum: ["success", "failed", "skipped"] }).notNull(),
+    error: text("error"),
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at").notNull(),
+  },
+  (table) => [uniqueIndex("pipeline_run_steps_run_step").on(table.runId, table.stepName)]
+);

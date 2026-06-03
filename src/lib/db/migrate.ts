@@ -269,6 +269,28 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_alert_events_fired ON alert_events(fired_at);
     CREATE INDEX IF NOT EXISTS idx_enrichment_queue_status ON enrichment_queue(status, priority);
 
+    -- Pipeline run records
+
+    CREATE TABLE IF NOT EXISTS pipeline_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      status TEXT NOT NULL CHECK(status IN ('running', 'success', 'failed')),
+      started_at TEXT NOT NULL,
+      finished_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS pipeline_run_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES pipeline_runs(id),
+      step_name TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('success', 'failed', 'skipped')),
+      error TEXT,
+      started_at TEXT NOT NULL,
+      finished_at TEXT NOT NULL,
+      UNIQUE(run_id, step_name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pipeline_run_steps_run ON pipeline_run_steps(run_id);
+
     -- Seed default alert rules
     INSERT OR IGNORE INTO alert_rules (id, name, description, rule_type, config, enabled, notify_slack)
     VALUES
