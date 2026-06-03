@@ -29,6 +29,7 @@ export async function evaluateAlerts() {
         .from(companyScores)
         .where(sql`
           ${companyScores.repoId} IS NULL
+          AND ${companyScores.scope} = 'own'
           AND ${companyScores.date} = ${today}
           AND ${companyScores.score} >= ${minScore}
           AND ${companyScores.userCount} >= ${minUsers}
@@ -70,7 +71,9 @@ export async function evaluateAlerts() {
         score: companyScores.score,
       })
         .from(companyScores)
-        .where(sql`${companyScores.repoId} IS NULL AND ${companyScores.date} = ${today}`)
+        .where(
+          sql`${companyScores.repoId} IS NULL AND ${companyScores.scope} = 'own' AND ${companyScores.date} = ${today}`
+        )
         .all();
 
       for (const c of current) {
@@ -79,6 +82,7 @@ export async function evaluateAlerts() {
           .where(sql`
             ${companyScores.companyId} = ${c.companyId}
             AND ${companyScores.repoId} IS NULL
+            AND ${companyScores.scope} = 'own'
             AND ${companyScores.date} <= ${compareDate}
           `)
           .orderBy(sql`${companyScores.date} DESC`)
