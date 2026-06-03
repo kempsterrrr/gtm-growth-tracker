@@ -15,6 +15,13 @@
       "when": 1780519639616,
       "tag": "0001_competitor-attribution",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780521735518,
+      "tag": "0002_company-score-scope",
+      "breakpoints": true
     }
   ]
 }

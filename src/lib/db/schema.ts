@@ -351,6 +351,9 @@ export const companyScores = sqliteTable(
       .notNull()
       .references(() => companies.id),
     repoId: integer("repo_id").references(() => trackedRepos.id),
+    scope: text("scope", { enum: ["own", "competitor"] })
+      .notNull()
+      .default("own"),
     date: text("date").notNull(),
     score: real("score").notNull(),
     userCount: integer("user_count").notNull(),
