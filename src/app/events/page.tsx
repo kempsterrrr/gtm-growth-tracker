@@ -27,10 +27,9 @@ export default function EventsPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [events, setEvents] = useState<TrackedEvent[]>([]);
+  const [fetched, setFetched] = useState<{ key: string; data: TrackedEvent[] } | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // Form state
   const [formDate, setFormDate] = useState(todayIso());
@@ -38,8 +37,9 @@ export default function EventsPage() {
   const [formDescription, setFormDescription] = useState("");
   const [formCategory, setFormCategory] = useState<EventCategory>("custom");
 
+  const fetchKey = `${dateRange}|${filterCategory}`;
+
   async function fetchEvents() {
-    setLoading(true);
     const params = new URLSearchParams();
     const dateParams = buildQueryString();
     if (dateParams) {
@@ -50,12 +50,30 @@ export default function EventsPage() {
 
     const res = await fetch(`/api/events?${params.toString()}`);
     const data: TrackedEvent[] = await res.json();
-    setEvents(data);
-    setLoading(false);
+    setFetched({ key: `${dateRange}|${filterCategory}`, data });
   }
 
+  // Loading is derived from key mismatch — no setState in the effect body.
+  const events = fetched && fetched.key === fetchKey ? fetched.data : null;
+
   useEffect(() => {
-    fetchEvents();
+    let cancelled = false;
+    const params = new URLSearchParams();
+    const dateParams = buildQueryString();
+    if (dateParams) {
+      const dp = new URLSearchParams(dateParams);
+      dp.forEach((v, k) => params.set(k, v));
+    }
+    if (filterCategory) params.set("category", filterCategory);
+
+    fetch(`/api/events?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data: TrackedEvent[]) => {
+        if (!cancelled) setFetched({ key: `${dateRange}|${filterCategory}`, data });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [dateRange, filterCategory, buildQueryString]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -203,7 +221,7 @@ export default function EventsPage() {
         )}
 
         {/* Events table */}
-        {!loading && events.length > 0 && (
+        {events && events.length > 0 && (
           <div className="border rounded-lg">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -263,7 +281,7 @@ export default function EventsPage() {
           </div>
         )}
 
-        {!loading && events.length === 0 && (
+        {events && events.length === 0 && (
           <div className="flex items-center justify-center h-48 text-muted-foreground">
             No events found. Create manual events or run the data collector to auto-detect releases.
           </div>
