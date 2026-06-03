@@ -1,4 +1,5 @@
 import { syncConfig } from "../../scripts/sync-config";
+import { seedDefaults } from "../db/seed-defaults";
 import { collectGithubMetrics } from "../collectors/github";
 import { collectNpmDownloads } from "../collectors/npm";
 import { collectPypiDownloads } from "../collectors/pypi";
@@ -23,6 +24,8 @@ import type { PipelineStep } from "./runner";
  */
 export const pipelineSteps: PipelineStep[] = [
   { name: "config-sync", dependsOn: [], run: async () => syncConfig() },
+  // Data seeding (formerly migration DDL) — default alert rules
+  { name: "seed-defaults", dependsOn: ["config-sync"], run: async () => seedDefaults() },
 
   // Metric collectors — independent of each other. GitHub steps fail fast with
   // a typed GithubAuthError from createGithubClient() when GITHUB_TOKEN is unset.
@@ -50,6 +53,10 @@ export const pipelineSteps: PipelineStep[] = [
     run: () => resolveCompanies(),
   },
   { name: "company-scoring", dependsOn: ["company-resolution"], run: () => scoreCompanies() },
-  { name: "alerts-evaluator", dependsOn: ["company-scoring"], run: () => evaluateAlerts() },
+  {
+    name: "alerts-evaluator",
+    dependsOn: ["company-scoring", "seed-defaults"],
+    run: () => evaluateAlerts(),
+  },
   { name: "slack-notifier", dependsOn: ["alerts-evaluator"], run: () => sendAlertNotifications() },
 ];
