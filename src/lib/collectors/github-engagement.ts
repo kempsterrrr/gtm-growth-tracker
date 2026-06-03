@@ -1,11 +1,19 @@
 import { getDb } from "../db/client";
 import { trackedRepos, githubUsers, githubEngagementEvents, enrichmentQueue, collectionCursors } from "../db/schema";
 import { createGithubClient, type GithubClient } from "../api-clients/github-client";
-import { ENRICHMENT_PRIORITY } from "../types/scoring";
+import { ENRICHMENT_PRIORITY, COMPETITOR_PRIORITY_OFFSET } from "../types/scoring";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
 
 const MAX_PAGES_PER_ENDPOINT = 5;
+// First collection of a competitor repo backfills full engagement history so
+// the prospect list is complete immediately (PRD #17). Sized for the PRD's
+// mid-size competitor assumption (~5k stars); the star cursor resumes across
+// runs if a repo exceeds it. Commits stay on the incremental window — they
+// are a weight-0 employee signal (#23), not prospect signal.
+const BACKFILL_MAX_PAGES = 60;
+const BACKFILL_PR_MAX_PAGES = 20;
+const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
 
 function ensureUser(db: ReturnType<typeof getDb>, login: string, githubId?: number, avatarUrl?: string): number {
   db.insert(githubUsers)
@@ -28,8 +36,15 @@ function recordEvent(
     .run();
 }
 
-function queueEnrichment(db: ReturnType<typeof getDb>, login: string, eventType: EngagementEventType) {
-  const priority = ENRICHMENT_PRIORITY[eventType];
+function queueEnrichment(
+  db: ReturnType<typeof getDb>,
+  login: string,
+  eventType: EngagementEventType,
+  competitor: boolean
+) {
+  // Own-repo users always outrank competitor-repo users in the queue; the
+  // MAX() upsert lifts anyone who later engages our own repos.
+  const priority = ENRICHMENT_PRIORITY[eventType] + (competitor ? COMPETITOR_PRIORITY_OFFSET : 0);
   db.insert(enrichmentQueue)
     .values({ userLogin: login, priority, status: "pending" })
     .onConflictDoUpdate({
@@ -71,7 +86,12 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
   for (const repo of repos) {
     const owner = repo.owner;
     const name = repo.name;
-    console.log(`[engagement] Collecting ${owner}/${name}...`);
+    const isCompetitor = repo.competitor != null;
+    const backfill = isCompetitor && !getCursor(db, "backfilled", repo.id);
+    const listMaxPages = backfill ? BACKFILL_MAX_PAGES : MAX_PAGES_PER_ENDPOINT;
+    console.log(
+      `[engagement] Collecting ${owner}/${name}...${backfill ? " (competitor full-history backfill)" : ""}`
+    );
 
     // Stars (resumable page cursor)
     const starPage = parseInt(getCursor(db, "stargazers", repo.id) || "1");
@@ -79,12 +99,12 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     try {
       for await (const page of client.stargazerPages(owner, name, {
         startPage: starPage,
-        maxPages: MAX_PAGES_PER_ENDPOINT,
+        maxPages: listMaxPages,
       })) {
         for (const s of page.items) {
           const userId = ensureUser(db, s.user.login, s.user.id, s.user.avatar_url);
           recordEvent(db, repo.id, userId, "star", s.starred_at?.split("T")[0] || null, "star");
-          queueEnrichment(db, s.user.login, "star");
+          queueEnrichment(db, s.user.login, "star", isCompetitor);
           starCount++;
         }
         setCursor(db, "stargazers", repo.id, page.isLast ? "1" : String(page.page + 1));
@@ -97,11 +117,11 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     // Forks
     let forkCount = 0;
     try {
-      for await (const page of client.forkPages(owner, name, { maxPages: MAX_PAGES_PER_ENDPOINT })) {
+      for await (const page of client.forkPages(owner, name, { maxPages: listMaxPages })) {
         for (const f of page.items) {
           const userId = ensureUser(db, f.owner.login, f.owner.id, f.owner.avatar_url);
           recordEvent(db, repo.id, userId, "fork", f.created_at?.split("T")[0] || null, `fork-${f.owner.login}`);
-          queueEnrichment(db, f.owner.login, "fork");
+          queueEnrichment(db, f.owner.login, "fork", isCompetitor);
           forkCount++;
         }
       }
@@ -110,15 +130,17 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     }
     console.log(`[engagement] ${owner}/${name}: ${forkCount} forks processed`);
 
-    // Issues (since last collection)
-    const issueSince = getCursor(db, "issues_since", repo.id) || new Date(Date.now() - 90 * 86400000).toISOString();
+    // Issues (since last collection; full history on a competitor's first run)
+    const issueSince =
+      getCursor(db, "issues_since", repo.id) ||
+      (backfill ? EPOCH_ISO : new Date(Date.now() - 90 * 86400000).toISOString());
     let issueCount = 0;
     try {
       for await (const page of client.issuePages(owner, name, issueSince, { maxPages: MAX_PAGES_PER_ENDPOINT })) {
         for (const i of page.items) {
           const userId = ensureUser(db, i.user.login, i.user.id, i.user.avatar_url);
           recordEvent(db, repo.id, userId, "issue", i.created_at?.split("T")[0] || null, `issue-${i.number}`, JSON.stringify({ title: i.title }));
-          queueEnrichment(db, i.user.login, "issue");
+          queueEnrichment(db, i.user.login, "issue", isCompetitor);
           issueCount++;
         }
       }
@@ -131,11 +153,13 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     // PRs
     let prCount = 0;
     try {
-      for await (const page of client.prPages(owner, name, { maxPages: 3 })) {
+      for await (const page of client.prPages(owner, name, {
+        maxPages: backfill ? BACKFILL_PR_MAX_PAGES : 3,
+      })) {
         for (const p of page.items) {
           const userId = ensureUser(db, p.user.login, p.user.id, p.user.avatar_url);
           recordEvent(db, repo.id, userId, "pr", p.created_at?.split("T")[0] || null, `pr-${p.number}`, JSON.stringify({ title: p.title }));
-          queueEnrichment(db, p.user.login, "pr");
+          queueEnrichment(db, p.user.login, "pr", isCompetitor);
           prCount++;
         }
       }
@@ -153,7 +177,7 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
           if (!c.author?.login) continue;
           const userId = ensureUser(db, c.author.login, c.author.id, c.author.avatar_url);
           recordEvent(db, repo.id, userId, "commit", c.commit.author.date?.split("T")[0] || null, c.sha, JSON.stringify({ email: c.commit.author.email }));
-          queueEnrichment(db, c.author.login, "commit");
+          queueEnrichment(db, c.author.login, "commit", isCompetitor);
           commitCount++;
         }
       }
@@ -162,5 +186,7 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     }
     setCursor(db, "commits_since", repo.id, new Date().toISOString());
     console.log(`[engagement] ${owner}/${name}: ${commitCount} commits processed`);
+
+    if (backfill) setCursor(db, "backfilled", repo.id, "1");
   }
 }
