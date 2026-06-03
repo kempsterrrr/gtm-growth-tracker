@@ -54,6 +54,54 @@ export async function getPackageInfo(
   return resp.json();
 }
 
+export interface DepsDevVersionResponse {
+  relatedProjects?: Array<{ projectKey: { id: string }; relationType: string }>;
+  links?: Array<{ label: string; url: string }>;
+}
+
+/** Resolve a dependent package's source repo as "github.com/owner/name" via
+ *  deps.dev GetVersion (default version looked up when none is stored).
+ *  Returns null for unknown packages and non-GitHub sources — callers skip
+ *  those dependents. fetchImpl is the test seam. */
+export async function getPackageSourceRepo(
+  registry: string,
+  pkg: string,
+  version: string | null,
+  fetchImpl: typeof fetch = fetch
+): Promise<string | null> {
+  const system = registryToSystem(registry);
+  const encodedPkg = encodeURIComponent(pkg);
+
+  let v = version;
+  if (!v) {
+    const infoResp = await fetchImpl(
+      `${DEPS_DEV_API_BASE}/systems/${system}/packages/${encodedPkg}`
+    );
+    if (!infoResp.ok) return null;
+    const info: DepsDevPackageInfo = await infoResp.json();
+    v = info.versions?.find((x) => x.isDefault)?.versionKey.version ?? null;
+    if (!v) return null;
+  }
+
+  const resp = await fetchImpl(
+    `${DEPS_DEV_API_BASE}/systems/${system}/packages/${encodedPkg}/versions/${encodeURIComponent(v)}`
+  );
+  if (!resp.ok) return null;
+  const data: DepsDevVersionResponse = await resp.json();
+
+  const related = data.relatedProjects?.find(
+    (p) => p.relationType === "SOURCE_REPO" && p.projectKey.id.startsWith("github.com/")
+  );
+  if (related) return related.projectKey.id;
+
+  const link = data.links?.find((l) => l.label === "SOURCE_REPO" && l.url.includes("github.com/"));
+  if (link) {
+    const m = link.url.match(/github\.com\/([^/]+)\/([^/?#]+)/);
+    if (m) return `github.com/${m[1]}/${m[2].replace(/\.git$/, "")}`;
+  }
+  return null;
+}
+
 export async function getDependents(
   registry: string,
   pkg: string
