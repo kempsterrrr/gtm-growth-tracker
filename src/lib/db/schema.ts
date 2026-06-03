@@ -223,6 +223,12 @@ export const githubUsers = sqliteTable("github_users", {
   avatarUrl: text("avatar_url"),
   location: text("location"),
   twitterUsername: text("twitter_username"),
+  /** Likely competitor employee: the competitor's name, with the signal that
+   *  tagged them. Additive metadata — never deleted, set once. */
+  competitorEmployee: text("competitor_employee"),
+  competitorEmployeeSource: text("competitor_employee_source", {
+    enum: ["commit_activity", "org_membership", "domain_match"],
+  }),
   enrichedAt: text("enriched_at"),
   createdAt: text("created_at")
     .notNull()

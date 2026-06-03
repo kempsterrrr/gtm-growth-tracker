@@ -462,6 +462,25 @@ describe("schema equivalence (upgrade-path gate)", () => {
     ]);
     db.close();
   });
+
+  it("the migrations add the competitor-employee tagging columns", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "employee-tags.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const cols = (
+      db.prepare("PRAGMA table_info(github_users)").all() as Array<{
+        name: string;
+        notnull: number;
+      }>
+    )
+      .filter((c) => c.name.startsWith("competitor_employee"))
+      .map((c) => ({ name: c.name, notnull: c.notnull }));
+    expect(cols).toEqual([
+      { name: "competitor_employee", notnull: 0 },
+      { name: "competitor_employee_source", notnull: 0 },
+    ]);
+    db.close();
+  });
 });
 
 describe("live-data migration (hard gate)", () => {
