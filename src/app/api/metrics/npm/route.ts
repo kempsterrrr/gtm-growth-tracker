@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { npmDownloads, trackedPackages } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { daysAgoIso, growthPercent } from "@/lib/dates";
+import type { NpmPackageSummary, DownloadRow } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -15,14 +17,14 @@ export async function GET(request: NextRequest) {
   if (!packageId) {
     const packages = db.select().from(trackedPackages).where(eq(trackedPackages.registry, "npm")).all();
 
-    const summaries = packages.map((pkg) => {
+    const summaries: NpmPackageSummary[] = packages.map((pkg) => {
       const last7d = db
         .select({ total: sql<number>`SUM(${npmDownloads.downloads})` })
         .from(npmDownloads)
         .where(
           and(
             eq(npmDownloads.packageId, pkg.id),
-            gte(npmDownloads.date, getDateDaysAgo(7))
+            gte(npmDownloads.date, daysAgoIso(7))
           )
         )
         .get();
@@ -33,15 +35,15 @@ export async function GET(request: NextRequest) {
         .where(
           and(
             eq(npmDownloads.packageId, pkg.id),
-            gte(npmDownloads.date, getDateDaysAgo(14)),
-            lte(npmDownloads.date, getDateDaysAgo(7))
+            gte(npmDownloads.date, daysAgoIso(14)),
+            lte(npmDownloads.date, daysAgoIso(7))
           )
         )
         .get();
 
       const current = last7d?.total || 0;
       const previous = prev7d?.total || 0;
-      const growth = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+      const growth = growthPercent(current, previous);
 
       return {
         id: pkg.id,
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
   if (startDate) conditions.push(gte(npmDownloads.date, startDate));
   if (endDate) conditions.push(lte(npmDownloads.date, endDate));
 
-  const data = db
+  const data: DownloadRow[] = db
     .select({
       date: npmDownloads.date,
       downloads: npmDownloads.downloads,
@@ -73,8 +75,3 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data);
 }
 
-function getDateDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().split("T")[0];
-}

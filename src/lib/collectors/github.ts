@@ -2,6 +2,7 @@ import { getDb } from "../db/client";
 import { trackedRepos, githubRepoMetrics, githubTrafficClones, githubTrafficViews } from "../db/schema";
 import { createGithubClient, type GithubClient } from "../api-clients/github-client";
 import { sql } from "drizzle-orm";
+import { todayIso } from "../dates";
 
 export async function collectGithubMetrics(client: GithubClient = createGithubClient()) {
   const db = getDb();
@@ -12,7 +13,7 @@ export async function collectGithubMetrics(client: GithubClient = createGithubCl
     return;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIso();
 
   for (const repo of repos) {
     try {

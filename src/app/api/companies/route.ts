@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { companies, companyScores } from "@/lib/db/schema";
 import { sql, desc } from "drizzle-orm";
+import { todayIso, daysAgoIso } from "@/lib/dates";
+import type { CompanySummary } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -10,8 +12,8 @@ export async function GET(request: NextRequest) {
   const minScore = parseFloat(searchParams.get("minScore") || "0");
 
   const db = getDb();
-  const today = new Date().toISOString().split("T")[0];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+  const today = todayIso();
+  const sevenDaysAgo = daysAgoIso(7);
 
   // Get companies with their latest aggregate scores
   const results = db
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
     .all();
 
   // Add trend data
-  const withTrend = results.map((r) => {
+  const withTrend: CompanySummary[] = results.map((r) => {
     const prevScore = db
       .select({ score: companyScores.score })
       .from(companyScores)

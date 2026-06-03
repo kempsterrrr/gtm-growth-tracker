@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { pypiDownloads, trackedPackages } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { daysAgoIso } from "@/lib/dates";
+import type { PypiPackageSummary, PypiDownloadRow } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
       .where(eq(trackedPackages.registry, "pypi"))
       .all();
 
-    const summaries = packages.map((pkg) => {
+    const summaries: PypiPackageSummary[] = packages.map((pkg) => {
       const last7d = db
         .select({ total: sql<number>`SUM(${pypiDownloads.downloads})` })
         .from(pypiDownloads)
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
           and(
             eq(pypiDownloads.packageId, pkg.id),
             eq(pypiDownloads.category, "overall"),
-            gte(pypiDownloads.date, getDateDaysAgo(7))
+            gte(pypiDownloads.date, daysAgoIso(7))
           )
         )
         .get();
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
   if (startDate) conditions.push(gte(pypiDownloads.date, startDate));
   if (endDate) conditions.push(lte(pypiDownloads.date, endDate));
 
-  const data = db
+  const data: PypiDownloadRow[] = db
     .select({
       date: pypiDownloads.date,
       downloads: pypiDownloads.downloads,
@@ -63,8 +65,3 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data);
 }
 
-function getDateDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().split("T")[0];
-}

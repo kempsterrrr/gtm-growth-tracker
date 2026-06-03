@@ -6,25 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Plus, Play, Loader2, MessageSquare } from "lucide-react";
 import { validatePackageName } from "@/lib/validation/package-name";
-
-interface TrackedRepo {
-  id: number;
-  owner: string;
-  name: string;
-  displayName: string | null;
-}
-
-interface TrackedPackage {
-  id: number;
-  registry: string;
-  name: string;
-  displayName: string | null;
-  repoId: number | null;
-}
+import type { TrackedRepoRow, TrackedPackageRow } from "@/lib/types/api";
 
 export default function SettingsPage() {
-  const [repos, setRepos] = useState<TrackedRepo[]>([]);
-  const [packages, setPackages] = useState<TrackedPackage[]>([]);
+  const [repos, setRepos] = useState<TrackedRepoRow[]>([]);
+  const [packages, setPackages] = useState<TrackedPackageRow[]>([]);
   const [collecting, setCollecting] = useState(false);
   const [collectResult, setCollectResult] = useState<string[]>([]);
 

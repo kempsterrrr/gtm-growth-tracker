@@ -2,6 +2,7 @@ import { getDb } from "../db/client";
 import { trackedPackages, reverseDependencies, reverseDependencyCounts, events } from "../db/schema";
 import { getDependents } from "../api-clients/deps-dev-client";
 import { sql } from "drizzle-orm";
+import { todayIso } from "../dates";
 
 export async function collectDependencies() {
   const db = getDb();
@@ -12,7 +13,7 @@ export async function collectDependencies() {
     return;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIso();
 
   for (const pkg of packages) {
     try {

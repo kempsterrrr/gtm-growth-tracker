@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { AlertRuleRow } from "@/lib/types/api";
 import { alertRules } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export async function GET() {
   const db = getDb();
-  const rules = db.select().from(alertRules).all();
+  const rules: AlertRuleRow[] = db.select().from(alertRules).all();
   return NextResponse.json(rules);
 }
 

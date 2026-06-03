@@ -7,27 +7,9 @@ import { MetricCard } from "@/components/charts/MetricCard";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
+import { toIsoDate } from "@/lib/dates";
 import type { EventCategory } from "@/lib/types/events";
-
-interface NpmPackage {
-  id: number;
-  name: string;
-  displayName: string | null;
-  downloadsLast7d: number;
-  growthPercent7d: number;
-}
-
-interface DownloadRow {
-  date: string;
-  downloads: number;
-}
-
-interface EventRow {
-  date: string;
-  title: string;
-  category: EventCategory;
-  description?: string;
-}
+import type { NpmPackageSummary, DownloadRow, TrackedEvent } from "@/lib/types/api";
 
 function aggregateWeekly(data: DownloadRow[]): Record<string, string | number>[] {
   const weeks: Record<string, number> = {};
@@ -35,7 +17,7 @@ function aggregateWeekly(data: DownloadRow[]): Record<string, string | number>[]
     const date = new Date(d.date);
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
-    const key = weekStart.toISOString().split("T")[0];
+    const key = toIsoDate(weekStart);
     weeks[key] = (weeks[key] || 0) + d.downloads;
   }
   return Object.entries(weeks).map(([date, downloads]) => ({ date, downloads }));
@@ -54,10 +36,10 @@ export default function NpmPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [packages, setPackages] = useState<NpmPackage[]>([]);
+  const [packages, setPackages] = useState<NpmPackageSummary[]>([]);
   const [selectedPkg, setSelectedPkg] = useState<string>("");
   const [chartData, setChartData] = useState<DownloadRow[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [aggregation, setAggregation] = useState("daily");
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +47,7 @@ export default function NpmPage() {
   useEffect(() => {
     fetch("/api/metrics/npm")
       .then((r) => r.json())
-      .then((data: NpmPackage[]) => {
+      .then((data: NpmPackageSummary[]) => {
         setPackages(data);
         if (data.length > 0 && !selectedPkg) {
           setSelectedPkg(String(data[0].id));
@@ -84,7 +66,7 @@ export default function NpmPage() {
       fetch(`/api/metrics/npm?${qs}`).then((r) => r.json()),
       fetch(`/api/events?${buildQueryString()}`).then((r) => r.json()),
     ])
-      .then(([downloads, evts]: [DownloadRow[], EventRow[]]) => {
+      .then(([downloads, evts]: [DownloadRow[], TrackedEvent[]]) => {
         setChartData(downloads);
         setEvents(evts);
       })

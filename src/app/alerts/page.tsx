@@ -7,16 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Bell, Check, Plus, Trash2, MessageSquare } from "lucide-react";
 import type { FiredAlert, AlertRuleType, AlertRuleConfig } from "@/lib/types/sales-intelligence";
-
-interface AlertRule {
-  id: number;
-  name: string;
-  description: string | null;
-  ruleType: AlertRuleType;
-  config: string;
-  enabled: number;
-  notifySlack: number;
-}
+import type { AlertRuleRow } from "@/lib/types/api";
 
 const RULE_TYPE_LABELS: Record<AlertRuleType, string> = {
   score_threshold: "Score Threshold",
@@ -27,7 +18,7 @@ const RULE_TYPE_LABELS: Record<AlertRuleType, string> = {
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<FiredAlert[]>([]);
-  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [rules, setRules] = useState<AlertRuleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRuleForm, setShowRuleForm] = useState(false);
   const [ruleName, setRuleName] = useState("");
@@ -38,7 +29,7 @@ export default function AlertsPage() {
     Promise.all([
       fetch("/api/alerts?acknowledged=false").then((r) => r.json()),
       fetch("/api/alerts/rules").then((r) => r.json()),
-    ]).then(([a, r]: [FiredAlert[], AlertRule[]]) => {
+    ]).then(([a, r]: [FiredAlert[], AlertRuleRow[]]) => {
       setAlerts(a);
       setRules(r);
       setLoading(false);
@@ -82,7 +73,7 @@ export default function AlertsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: ruleName, ruleType, config }),
     });
-    const newRule: AlertRule = await res.json();
+    const newRule: AlertRuleRow = await res.json();
     setRules([...rules, newRule]);
     setShowRuleForm(false);
     setRuleName("");

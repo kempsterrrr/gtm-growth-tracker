@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { toIsoDate } from "@/lib/dates";
 
 export type Persona = "all" | "marketing" | "sales" | "engineering" | "gtm";
 
@@ -17,8 +18,8 @@ export function useDashboardFilters() {
     startDate.setDate(startDate.getDate() - days);
 
     return {
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
+      startDate: toIsoDate(startDate),
+      endDate: toIsoDate(endDate),
     };
   }, [dateRange]);
 

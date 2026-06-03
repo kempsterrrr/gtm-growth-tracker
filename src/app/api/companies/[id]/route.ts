@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { CompanyDetail } from "@/lib/types/api";
 import {
   companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents,
 } from "@/lib/db/schema";
@@ -76,7 +77,7 @@ export async function GET(
     };
   });
 
-  return NextResponse.json({
+  const payload: CompanyDetail = {
     ...company,
     score: latestScore?.score || 0,
     userCount: latestScore?.userCount || 0,
@@ -87,5 +88,6 @@ export async function GET(
     commitCount: latestScore?.commitCount || 0,
     scoreHistory,
     users,
-  });
+  };
+  return NextResponse.json(payload);
 }

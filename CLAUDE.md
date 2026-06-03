@@ -60,6 +60,7 @@ module on every add and parse. The Settings page edits config through
 
 ### Conventions
 
-- Dates are stored as ISO `YYYY-MM-DD` text; daily metric tables have a unique `(entityId, date)` index and collectors upsert on it.
+- Dates are stored as ISO `YYYY-MM-DD` text; ALL date formatting/windows/growth go through `src/lib/dates.ts` (`toIsoDate`/`todayIso`/`daysAgoIso`/`growthPercent` — never inline `.toISOString().split`). Daily metric tables have a unique `(entityId, date)` index and collectors upsert on it.
+- API contract: `src/lib/types/api.ts` declares every dashboard route's GET payload; routes annotate their payload consts with it and pages import the same types — never declare a response shape locally. The contract describes the wire exactly (e.g. SQLite 0/1 integers, not booleans).
 - Path alias `@/` → `src/`.
 - ar.io branding: Besley headlines, Plus Jakarta Sans body, primary purple `#5427C8` (see `globals.css` / Tailwind v4 config-in-CSS).

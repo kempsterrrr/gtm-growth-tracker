@@ -2,6 +2,7 @@ import { getDb } from "../db/client";
 import { trackedPackages, npmDownloads } from "../db/schema";
 import { getNpmRangeDownloads } from "../api-clients/npm-client";
 import { eq, sql } from "drizzle-orm";
+import { daysAgoIso } from "../dates";
 
 export async function collectNpmDownloads() {
   const db = getDb();
@@ -17,9 +18,7 @@ export async function collectNpmDownloads() {
   }
 
   // Collect yesterday's data
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = yesterday.toISOString().split("T")[0];
+  const dateStr = daysAgoIso(1);
 
   for (const pkg of packages) {
     try {
@@ -62,9 +61,7 @@ export async function backfillNpmDownloads(fromDate: string) {
     return;
   }
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const endDate = yesterday.toISOString().split("T")[0];
+  const endDate = daysAgoIso(1);
 
   for (const pkg of packages) {
     try {

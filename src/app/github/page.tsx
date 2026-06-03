@@ -8,57 +8,24 @@ import { Select } from "@/components/ui/select";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
 import { Star, GitFork, Eye, CircleDot, Users } from "lucide-react";
 import type { EventCategory } from "@/lib/types/events";
-
-interface GithubRepo {
-  id: number;
-  owner: string;
-  name: string;
-  displayName: string | null;
-  stars: number;
-  forks: number;
-  watchers: number;
-  openIssues: number;
-  contributors: number;
-}
-
-interface MetricRow {
-  date: string;
-  stars: number | null;
-  forks: number | null;
-  watchers: number | null;
-  openIssues: number | null;
-  contributors: number | null;
-}
-
-interface TrafficRow {
-  date: string;
-  total: number;
-  unique: number;
-}
-
-interface EventRow {
-  date: string;
-  title: string;
-  category: EventCategory;
-  description?: string;
-}
+import type { GithubRepoSummary, GithubMetricRow, TrafficRow, TrackedEvent } from "@/lib/types/api";
 
 export default function GithubPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [repos, setRepos] = useState<GithubRepo[]>([]);
+  const [repos, setRepos] = useState<GithubRepoSummary[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
-  const [metricsData, setMetricsData] = useState<MetricRow[]>([]);
+  const [metricsData, setMetricsData] = useState<GithubMetricRow[]>([]);
   const [clonesData, setClonesData] = useState<TrafficRow[]>([]);
   const [viewsData, setViewsData] = useState<TrafficRow[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/metrics/github")
       .then((r) => r.json())
-      .then((data: GithubRepo[]) => {
+      .then((data: GithubRepoSummary[]) => {
         setRepos(data);
         if (data.length > 0 && !selectedRepo) {
           setSelectedRepo(String(data[0].id));
@@ -78,7 +45,7 @@ export default function GithubPage() {
         r.json()
       ),
     ])
-      .then(([data, evts]: [{ metrics?: MetricRow[]; clones?: TrafficRow[]; views?: TrafficRow[] }, EventRow[]]) => {
+      .then(([data, evts]: [{ metrics?: GithubMetricRow[]; clones?: TrafficRow[]; views?: TrafficRow[] }, TrackedEvent[]]) => {
         setMetricsData(data.metrics || []);
         setClonesData(data.clones || []);
         setViewsData(data.views || []);

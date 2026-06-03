@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { todayIso } from "@/lib/dates";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,19 +12,7 @@ import {
   EVENT_CATEGORY_LABELS,
   type EventCategory,
 } from "@/lib/types/events";
-
-interface TrackedEvent {
-  id: number;
-  date: string;
-  title: string;
-  description: string | null;
-  category: EventCategory;
-  source: "auto" | "manual";
-  repoId: number | null;
-  packageId: number | null;
-  metadata: string | null;
-  createdAt: string;
-}
+import type { TrackedEvent } from "@/lib/types/api";
 
 const CATEGORIES: EventCategory[] = [
   "release",
@@ -44,7 +33,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
 
   // Form state
-  const [formDate, setFormDate] = useState(new Date().toISOString().split("T")[0]);
+  const [formDate, setFormDate] = useState(todayIso());
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formCategory, setFormCategory] = useState<EventCategory>("custom");
