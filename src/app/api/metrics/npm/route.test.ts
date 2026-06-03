@@ -35,6 +35,18 @@ const insert = sqlite.prepare(
 for (let d = 1; d <= 6; d++) insert.run(pkgId, daysAgoIso(d), 100);
 for (let d = 8; d <= 13; d++) insert.run(pkgId, daysAgoIso(d), 50);
 
+// A competitor-attributed package: must be invisible to the default list but
+// still served by id (the compare overlay in #20 reads it).
+sqlite
+  .prepare(
+    "INSERT INTO tracked_packages (registry, name, display_name, competitor) VALUES ('npm', 'rival-pkg', 'Rival', 'Acme')"
+  )
+  .run();
+const rivalId = (
+  sqlite.prepare("SELECT id FROM tracked_packages WHERE name='rival-pkg'").get() as { id: number }
+).id;
+for (let d = 1; d <= 6; d++) insert.run(rivalId, daysAgoIso(d), 999);
+
 describe("GET /api/metrics/npm (seeded temp DB)", () => {
   it("returns package summaries matching the contract, with windowed growth", async () => {
     const res = await GET(new NextRequest("http://localhost/api/metrics/npm"));
@@ -58,5 +70,17 @@ describe("GET /api/metrics/npm (seeded temp DB)", () => {
     const body = (await res.json()) as DownloadRow[];
     expect(body.length).toBe(12);
     expect(body[0]).toEqual({ date: daysAgoIso(13), downloads: 50 });
+  });
+
+  it("excludes competitor-attributed packages from the default list but serves them by id", async () => {
+    const listRes = await GET(new NextRequest("http://localhost/api/metrics/npm"));
+    const list = (await listRes.json()) as NpmPackageSummary[];
+    expect(list.map((p) => p.name)).not.toContain("rival-pkg");
+
+    const detailRes = await GET(
+      new NextRequest(`http://localhost/api/metrics/npm?packageId=${rivalId}`)
+    );
+    const detail = (await detailRes.json()) as DownloadRow[];
+    expect(detail.length).toBe(6);
   });
 });

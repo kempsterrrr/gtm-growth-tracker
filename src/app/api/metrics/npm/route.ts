@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { npmDownloads, trackedPackages } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, isNull } from "drizzle-orm";
 import { daysAgoIso, growthPercent } from "@/lib/dates";
 import type { NpmPackageSummary, DownloadRow } from "@/lib/types/api";
 
@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
 
   // If no packageId, return all packages with summary
   if (!packageId) {
-    const packages = db.select().from(trackedPackages).where(eq(trackedPackages.registry, "npm")).all();
+    const packages = db
+      .select()
+      .from(trackedPackages)
+      .where(and(eq(trackedPackages.registry, "npm"), isNull(trackedPackages.competitor)))
+      .all();
 
     const summaries: NpmPackageSummary[] = packages.map((pkg) => {
       const last7d = db
