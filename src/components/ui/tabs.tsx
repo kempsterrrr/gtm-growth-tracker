@@ -44,6 +44,7 @@ function TabsList({ className, ...props }: React.ComponentProps<"div">) {
 function TabsTrigger({
   className,
   value,
+  onClick,
   ...props
 }: React.ComponentProps<"button"> & { value: string }) {
   const { activeTab, setActiveTab } = React.useContext(TabsContext);
@@ -54,7 +55,12 @@ function TabsTrigger({
         activeTab === value && "bg-background text-foreground shadow",
         className
       )}
-      onClick={() => setActiveTab(value)}
+      // Chain instead of letting a caller onClick override the highlight
+      // update (callers like the npm aggregation tabs pass their own).
+      onClick={(e) => {
+        setActiveTab(value);
+        onClick?.(e);
+      }}
       {...props}
     />
   );

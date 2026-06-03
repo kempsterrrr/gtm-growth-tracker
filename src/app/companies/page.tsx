@@ -90,12 +90,20 @@ export default function CompaniesPage() {
 
         {!loading && companies.length > 0 && (
           <div className="space-y-3">
-            <Tabs value={segment} onValueChange={(v) => setSegment(v as SegmentFilter)}>
+            <Tabs defaultValue="all">
               <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="engaged">Engaged</TabsTrigger>
-                <TabsTrigger value="battleground">Battleground</TabsTrigger>
-                <TabsTrigger value="prospect">Net-new Prospect</TabsTrigger>
+                <TabsTrigger value="all" onClick={() => setSegment("all")}>
+                  All
+                </TabsTrigger>
+                <TabsTrigger value="engaged" onClick={() => setSegment("engaged")}>
+                  Engaged
+                </TabsTrigger>
+                <TabsTrigger value="battleground" onClick={() => setSegment("battleground")}>
+                  Battleground
+                </TabsTrigger>
+                <TabsTrigger value="prospect" onClick={() => setSegment("prospect")}>
+                  Net-new Prospect
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             {visible.length === 0 ? (
