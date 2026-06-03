@@ -23,7 +23,12 @@ export async function POST(request: NextRequest) {
   try {
     if (type === "repo") {
       // YAML first, then DB projection — handled inside the config module
-      addRepo({ owner: data.owner, name: data.name, display_name: data.displayName || undefined });
+      addRepo({
+        owner: data.owner,
+        name: data.name,
+        display_name: data.displayName || undefined,
+        competitor: data.competitor || undefined,
+      });
       const row = db
         .select()
         .from(trackedRepos)
@@ -34,7 +39,11 @@ export async function POST(request: NextRequest) {
 
     if (type === "package") {
       const name = (data.name ?? "").trim();
-      addPackage(data.registry, { name, display_name: data.displayName || undefined });
+      addPackage(data.registry, {
+        name,
+        display_name: data.displayName || undefined,
+        competitor: data.competitor || undefined,
+      });
       const row = db
         .select()
         .from(trackedPackages)
