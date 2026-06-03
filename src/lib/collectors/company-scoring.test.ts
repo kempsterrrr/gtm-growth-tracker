@@ -133,4 +133,59 @@ describe("scoreCompanies with competitor attribution", () => {
     ).n;
     expect(count).toBe(2); // exactly one own + one competitor — the NULL-repo dup bug is fixed
   });
+
+  it("excludes tagged competitor employees from competitor aggregation but keeps their own-side engagement", async () => {
+    // u3: issue on the competitor repo (would add 8 + breadth) AND a star on
+    // ours (adds 1) — tagged as a Pinata employee.
+    run("INSERT INTO github_users (login, competitor_employee, competitor_employee_source) VALUES ('u3', 'Acme', 'commit_activity')");
+    const u3 = (sqlite.prepare("SELECT id FROM github_users WHERE login='u3'").get() as { id: number }).id;
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      u3,
+      companyId
+    );
+    event(rivalRepoId, u3, "issue", "issue-77");
+    event(ownRepoId, u3, "star", "star-u3");
+
+    await scoreCompanies();
+    const today = todayIso();
+    const aggregate = (scope: string) =>
+      (
+        sqlite
+          .prepare(
+            "SELECT score FROM company_scores WHERE company_id = ? AND repo_id IS NULL AND scope = ? AND date = ?"
+          )
+          .get(companyId, scope, today) as { score: number }
+      ).score;
+
+    expect(aggregate("competitor")).toBe(34); // unchanged — u3's competitor issue excluded
+    expect(aggregate("own")).toBe(21); // 18 + u3's star (1) + breadth for a 3rd user (2)
+  });
+
+  it("never writes a competitor aggregate for the competitor's own company", async () => {
+    // A company named after the tracked competitor, with real engagement on
+    // the competitor repo — it must not rank as its own prospect.
+    run("INSERT INTO companies (name, domain) VALUES ('Acme', 'acme.dev')");
+    const acmeId = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='Acme'").get() as { id: number }
+    ).id;
+    run("INSERT INTO github_users (login) VALUES ('acme-fan')");
+    const fan = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='acme-fan'").get() as { id: number }
+    ).id;
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      fan,
+      acmeId
+    );
+    event(rivalRepoId, fan, "issue", "issue-acme");
+
+    await scoreCompanies();
+    const rows = sqlite
+      .prepare(
+        "SELECT scope FROM company_scores WHERE company_id = ? AND repo_id IS NULL"
+      )
+      .all(acmeId) as Array<{ scope: string }>;
+    expect(rows).toEqual([]); // no competitor aggregate → never a prospect
+  });
 });

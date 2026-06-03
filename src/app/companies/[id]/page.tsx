@@ -202,7 +202,14 @@ export default function CompanyDetailPage() {
                               />
                             )}
                             <div>
-                              <div className="font-medium">{user.login}</div>
+                              <div className="font-medium flex items-center gap-2">
+                                {user.login}
+                                {user.competitorEmployee && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    {user.competitorEmployee} employee
+                                  </Badge>
+                                )}
+                              </div>
                               {user.name && (
                                 <div className="text-xs text-muted-foreground">
                                   {user.name}

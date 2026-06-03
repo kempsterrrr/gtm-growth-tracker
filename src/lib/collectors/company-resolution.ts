@@ -1,6 +1,7 @@
 import { getDb } from "../db/client";
 import { githubUsers, githubUserEmails, githubUserOrgs, companies, githubUserCompanies } from "../db/schema";
 import { normalizeCompanyName, domainToCompanyName, isFreemailDomain } from "../utils/domain";
+import { tagCompetitorEmployees } from "./competitor-employees";
 import { sql } from "drizzle-orm";
 
 function getOrCreateCompanyByDomain(db: ReturnType<typeof getDb>, domain: string): number {
@@ -129,4 +130,8 @@ export async function resolveCompanies() {
   }
   console.log(`[company-resolution] Org membership: ${orgLinks} links`);
   console.log(`[company-resolution] Total: ${resolved + profileLinks + orgLinks} user-company links`);
+
+  // Employee tagging happens "during/after company resolution" (PRD #17) —
+  // it needs the freshly-resolved company links for the domain signal.
+  await tagCompetitorEmployees();
 }
