@@ -47,6 +47,26 @@ export interface CompanySummary {
 export interface CompanyDetail extends Omit<CompanySummary, "scoreTrend"> {
   users: CompanyUser[];
   scoreHistory: Array<{ date: string; score: number }>;
+  /** Which competitor repos/packages drove competitorScore (latest per entity). */
+  competitorAttribution: CompetitorAttributionRow[];
+}
+
+/** One competitor entity (repo today; packages join via the depends-on
+ *  signal in #22) that contributed to a company's competitor score, with the
+ *  engagement breakdown behind it — so outreach can reference the specific
+ *  competitor product the company is using. */
+export interface CompetitorAttributionRow {
+  competitor: string;
+  /** Repo as "owner/name" (package name once #22 lands). */
+  entity: string;
+  displayName: string | null;
+  score: number;
+  userCount: number;
+  starCount: number;
+  forkCount: number;
+  issueCount: number;
+  prCount: number;
+  commitCount: number;
 }
 
 export interface CompanyUser {
