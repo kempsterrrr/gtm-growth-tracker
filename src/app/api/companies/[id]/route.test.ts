@@ -53,6 +53,21 @@ const repoScore = (date: string, score: number, issues: number, forks: number) =
 repoScore(daysAgoIso(3), 8, 2, 1);
 repoScore(todayIso(), 14, 4, 2);
 
+// Depends-on signals on a competitor package: 2 dependents → score 24 row.
+sqlite
+  .prepare(
+    "INSERT INTO tracked_packages (registry, name, display_name, competitor) VALUES ('npm', 'pinata-js', 'Pinata JS', 'Pinata')"
+  )
+  .run();
+const rivalPkgId = (
+  sqlite.prepare("SELECT id FROM tracked_packages WHERE name='pinata-js'").get() as { id: number }
+).id;
+sqlite
+  .prepare(
+    "INSERT INTO company_competitor_signals (company_id, package_id, signal_type, dependent_name, first_seen) VALUES (?, ?, 'depends_on', 'acme-app', '2026-06-01'), (?, ?, 'depends_on', 'acme-cli', '2026-06-01')"
+  )
+  .run(companyId, rivalPkgId, companyId, rivalPkgId);
+
 const request = (id: number) =>
   GET(new NextRequest(`http://localhost/api/companies/${id}`), {
     params: Promise.resolve({ id: String(id) }),
@@ -79,14 +94,30 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("attributes the competitor score to its source repos (latest row per repo)", async () => {
+  it("attributes the competitor score to its sources (repos + package dependents, score desc)", async () => {
     const res = await request(companyId);
     const body = (await res.json()) as CompanyDetail;
     expect(body.competitorAttribution).toEqual([
       {
         competitor: "Pinata",
+        entity: "pinata-js",
+        displayName: "Pinata JS",
+        signal: "depends_on",
+        dependentCount: 2,
+        score: 24,
+        userCount: 0,
+        starCount: 0,
+        forkCount: 0,
+        issueCount: 0,
+        prCount: 0,
+        commitCount: 0,
+      },
+      {
+        competitor: "Pinata",
         entity: "pinata/pinata-sdk",
         displayName: "Pinata SDK",
+        signal: "engagement",
+        dependentCount: 0,
         score: 14,
         userCount: 1,
         starCount: 0,

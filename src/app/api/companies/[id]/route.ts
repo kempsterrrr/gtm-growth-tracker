@@ -3,7 +3,9 @@ import { getDb } from "@/lib/db/client";
 import type { CompanyDetail } from "@/lib/types/api";
 import {
   companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents, trackedRepos,
+  companyCompetitorSignals, trackedPackages,
 } from "@/lib/db/schema";
+import { DEPENDS_ON_WEIGHT, MAX_EVENTS_PER_TYPE } from "@/lib/types/scoring";
 import { sql, desc } from "drizzle-orm";
 import { deriveSegment } from "@/lib/segments";
 
@@ -72,12 +74,14 @@ export async function GET(
     )
     .orderBy(desc(companyScores.score))
     .all();
-  const competitorAttribution = attributionRows
+  const engagementAttribution = attributionRows
     .filter((r) => r.competitor != null)
     .map((r) => ({
       competitor: r.competitor!,
       entity: `${r.owner}/${r.name}`,
       displayName: r.displayName,
+      signal: "engagement" as const,
+      dependentCount: 0,
       score: r.score,
       userCount: r.userCount,
       starCount: r.starCount,
@@ -86,6 +90,40 @@ export async function GET(
       prCount: r.prCount,
       commitCount: r.commitCount,
     }));
+
+  // Depends-on signals (issue #22): one attribution row per competitor
+  // package, scored exactly as the scoring step does.
+  const signalRows = db
+    .select({
+      name: trackedPackages.name,
+      displayName: trackedPackages.displayName,
+      competitor: trackedPackages.competitor,
+      n: sql<number>`COUNT(*)`,
+    })
+    .from(companyCompetitorSignals)
+    .innerJoin(trackedPackages, sql`${companyCompetitorSignals.packageId} = ${trackedPackages.id}`)
+    .where(sql`${companyCompetitorSignals.companyId} = ${companyId}`)
+    .groupBy(companyCompetitorSignals.packageId)
+    .all();
+  const dependsOnAttribution = signalRows
+    .filter((r) => r.competitor != null)
+    .map((r) => ({
+      competitor: r.competitor!,
+      entity: r.name,
+      displayName: r.displayName,
+      signal: "depends_on" as const,
+      dependentCount: r.n,
+      score: Math.min(r.n, MAX_EVENTS_PER_TYPE) * DEPENDS_ON_WEIGHT,
+      userCount: 0,
+      starCount: 0,
+      forkCount: 0,
+      issueCount: 0,
+      prCount: 0,
+      commitCount: 0,
+    }));
+  const competitorAttribution = [...engagementAttribution, ...dependsOnAttribution].sort(
+    (a, b) => b.score - a.score
+  );
 
   // Users linked to this company
   const userLinks = db

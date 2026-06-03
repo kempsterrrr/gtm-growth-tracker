@@ -9,7 +9,7 @@ import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
 import { EngagementBadges } from "@/components/companies/EngagementBadges";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Globe, MapPin } from "lucide-react";
-import { formatEngagementBreakdown } from "../transforms";
+import { formatEngagementBreakdown, formatDependentCount } from "../transforms";
 import type {
   CompanyDetail,
   CompanyUser,
@@ -123,12 +123,24 @@ export default function CompanyDetailPage() {
                 <div key={row.entity} className="px-4 py-3 flex items-center justify-between">
                   <div>
                     <span className="text-sm">
-                      engages with <span className="font-medium">{row.competitor}</span>:{" "}
-                      {formatEngagementBreakdown(row)} on{" "}
-                      <span className="font-medium">{row.displayName || row.entity}</span>
+                      {row.signal === "depends_on" ? (
+                        <>
+                          ships code on <span className="font-medium">{row.competitor}</span>:{" "}
+                          {formatDependentCount(row.dependentCount)} use{" "}
+                          <span className="font-medium">{row.displayName || row.entity}</span>
+                        </>
+                      ) : (
+                        <>
+                          engages with <span className="font-medium">{row.competitor}</span>:{" "}
+                          {formatEngagementBreakdown(row)} on{" "}
+                          <span className="font-medium">{row.displayName || row.entity}</span>
+                        </>
+                      )}
                     </span>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {row.entity} · {row.userCount} {row.userCount === 1 ? "user" : "users"}
+                      {row.entity}
+                      {row.signal === "engagement" &&
+                        ` · ${row.userCount} ${row.userCount === 1 ? "user" : "users"}`}
                     </div>
                   </div>
                   <Badge variant="secondary" className="text-xs">

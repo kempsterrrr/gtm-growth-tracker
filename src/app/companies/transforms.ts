@@ -47,3 +47,8 @@ export function formatEngagementBreakdown(counts: {
   add(counts.commitCount, "commit");
   return parts.length > 0 ? parts.join(", ") : "no engagement recorded";
 }
+
+/** "2 dependent repos" — the depends-on attribution phrasing. */
+export function formatDependentCount(n: number): string {
+  return `${n} dependent ${n === 1 ? "repo" : "repos"}`;
+}
