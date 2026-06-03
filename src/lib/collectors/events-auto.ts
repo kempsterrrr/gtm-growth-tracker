@@ -1,9 +1,9 @@
 import { getDb } from "../db/client";
 import { trackedRepos, events } from "../db/schema";
-import { getReleases } from "../api-clients/github-client";
+import { createGithubClient, type GithubClient } from "../api-clients/github-client";
 import { sql } from "drizzle-orm";
 
-export async function collectAutoEvents() {
+export async function collectAutoEvents(client: GithubClient = createGithubClient()) {
   const db = getDb();
   const repos = db.select().from(trackedRepos).all();
 
@@ -15,7 +15,7 @@ export async function collectAutoEvents() {
   for (const repo of repos) {
     try {
       console.log(`[events-auto] Scanning releases for ${repo.owner}/${repo.name}...`);
-      const releases = await getReleases(repo.owner, repo.name);
+      const releases = await client.getReleases(repo.owner, repo.name);
 
       let newCount = 0;
       for (const release of releases) {

@@ -1,9 +1,9 @@
 import { getDb } from "../db/client";
 import { trackedRepos, githubRepoMetrics, githubTrafficClones, githubTrafficViews } from "../db/schema";
-import { getRepo, getTrafficClones, getTrafficViews, getContributorStats } from "../api-clients/github-client";
+import { createGithubClient, type GithubClient } from "../api-clients/github-client";
 import { sql } from "drizzle-orm";
 
-export async function collectGithubMetrics() {
+export async function collectGithubMetrics(client: GithubClient = createGithubClient()) {
   const db = getDb();
   const repos = db.select().from(trackedRepos).all();
 
@@ -19,12 +19,12 @@ export async function collectGithubMetrics() {
       console.log(`[github] Collecting ${repo.owner}/${repo.name}...`);
 
       // Fetch repo metadata
-      const repoData = await getRepo(repo.owner, repo.name);
+      const repoData = await client.getRepo(repo.owner, repo.name);
 
       // Fetch contributor count
       let contributorCount: number | null = null;
       try {
-        const contributors = await getContributorStats(repo.owner, repo.name);
+        const contributors = await client.getContributorStats(repo.owner, repo.name);
         contributorCount = contributors.length;
       } catch (err) {
         console.warn(`[github] Could not fetch contributors for ${repo.owner}/${repo.name}:`, err);
@@ -60,7 +60,7 @@ export async function collectGithubMetrics() {
 
       // Fetch and archive traffic data (requires push access)
       try {
-        const clones = await getTrafficClones(repo.owner, repo.name);
+        const clones = await client.getTrafficClones(repo.owner, repo.name);
         for (const c of clones.clones) {
           const cloneDate = c.timestamp.split("T")[0];
           db.insert(githubTrafficClones)
@@ -85,7 +85,7 @@ export async function collectGithubMetrics() {
       }
 
       try {
-        const views = await getTrafficViews(repo.owner, repo.name);
+        const views = await client.getTrafficViews(repo.owner, repo.name);
         for (const v of views.views) {
           const viewDate = v.timestamp.split("T")[0];
           db.insert(githubTrafficViews)
