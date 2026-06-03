@@ -36,6 +36,13 @@
       "when": 1780524447345,
       "tag": "0004_competitor-employee-tagging",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1780524916985,
+      "tag": "0005_competitor-alert-rules",
+      "breakpoints": true
     }
   ]
 }

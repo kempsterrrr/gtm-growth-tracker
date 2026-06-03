@@ -481,6 +481,21 @@ describe("schema equivalence (upgrade-path gate)", () => {
     ]);
     db.close();
   });
+
+  it("the migrations widen the alert rule-type check to the competitor rules", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "alert-types.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const createSql = (
+      db
+        .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='alert_rules'")
+        .get() as { sql: string }
+    ).sql;
+    for (const t of ["new_prospect", "battleground_shift", "competitor_employee_engagement"]) {
+      expect(createSql).toContain(`'${t}'`);
+    }
+    db.close();
+  });
 });
 
 describe("live-data migration (hard gate)", () => {

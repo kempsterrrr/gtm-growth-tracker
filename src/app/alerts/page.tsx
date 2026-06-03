@@ -14,6 +14,9 @@ const RULE_TYPE_LABELS: Record<AlertRuleType, string> = {
   new_company: "New Company",
   engagement_spike: "Engagement Spike",
   new_enterprise_user: "Enterprise User",
+  new_prospect: "New Prospect",
+  battleground_shift: "Battleground Shift",
+  competitor_employee_engagement: "Competitor Employee Engagement",
 };
 
 export default function AlertsPage() {

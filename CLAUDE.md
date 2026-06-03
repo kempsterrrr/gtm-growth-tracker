@@ -87,7 +87,13 @@ the END of company-resolution (not a pipeline step); tagging is additive
 competitor-scope aggregation only (own-side engagement stays visible,
 badged in the UI), and the competitor's own company (tracked name or
 configured domain match) never gets a competitor aggregate — it can't rank
-as its own prospect.
+as its own prospect. Alerts: seven rule types — the original four plus
+`new_prospect` (competitor-only aggregate over threshold),
+`battleground_shift` (segment transitions to battleground from either
+side, prior state required), and `competitor_employee_engagement` (tagged
+users on own repos, `collected_at`-windowed so backfills never fire); all
+seeded by seed-defaults, 7-day debounce per company (per user for the
+employee rule).
 
 ### Deployment & data lifecycle
 
