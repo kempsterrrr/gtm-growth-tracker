@@ -37,6 +37,9 @@ COPY --from=builder /app/public ./public
 # Copy config and data directory
 COPY --from=builder /app/gtm-config.yaml ./gtm-config.yaml
 
+# Copy generated migrations (runMigrations reads ./drizzle at runtime)
+COPY --from=builder /app/drizzle ./drizzle
+
 # Create writable data directory for SQLite
 RUN mkdir -p data && chown nextjs:nodejs data
 

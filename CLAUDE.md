@@ -22,15 +22,22 @@ Next.js 16 App Router dashboard + a standalone collection pipeline, both reading
 
 ### Two halves, one database
 
-1. **Collection pipeline** (`src/scripts/collect-all.ts`, run via `npm run collect` or the daily GitHub Action): a thin adapter over `src/lib/pipeline/` — `definition.ts` is the **single registry** of all 13 steps (`config-sync`, the five independent metric collectors `github`/`npm`/`pypi`/`deps-dev`/`events-auto`, and the linear sales-intelligence chain `github-engagement` → `github-user-enrichment` → `github-commit-emails` → `company-resolution` → `company-scoring` → `alerts-evaluator` → `slack-notifier`), and `runner.ts` (`runPipeline`) owns dependency ordering, per-step failure isolation (a failed step marks its transitive dependents `skipped`; independent steps still run), and persists a run record to `pipeline_runs`/`pipeline_run_steps`. The CLI exits non-zero if any step failed; the manual trigger (`src/app/api/collect/route.ts`) runs the identical definition. Adding a collector = one entry in `definition.ts`. Each step lives in `src/lib/collectors/`. ALL GitHub HTTP access goes through the single deep client `src/lib/api-clients/github-client.ts` (`createGithubClient` — owns auth, the one rate-limit wait policy, pagination iterators, typed `GithubApiError`/`GithubAuthError`); collectors accept an injected `GithubClient` for offline testing. Other registries use the simple clients in `src/lib/api-clients/`.
+1. **Collection pipeline** (`src/scripts/collect-all.ts`, run via `npm run collect` or the daily GitHub Action): a thin adapter over `src/lib/pipeline/` — `definition.ts` is the **single registry** of all 14 steps (`config-sync`, `seed-defaults`, the five independent metric collectors `github`/`npm`/`pypi`/`deps-dev`/`events-auto`, and the linear sales-intelligence chain `github-engagement` → `github-user-enrichment` → `github-commit-emails` → `company-resolution` → `company-scoring` → `alerts-evaluator` → `slack-notifier`), and `runner.ts` (`runPipeline`) owns dependency ordering, per-step failure isolation (a failed step marks its transitive dependents `skipped`; independent steps still run), and persists a run record to `pipeline_runs`/`pipeline_run_steps`. The CLI exits non-zero if any step failed; the manual trigger (`src/app/api/collect/route.ts`) runs the identical definition. Adding a collector = one entry in `definition.ts`. Each step lives in `src/lib/collectors/`. ALL GitHub HTTP access goes through the single deep client `src/lib/api-clients/github-client.ts` (`createGithubClient` — owns auth, the one rate-limit wait policy, pagination iterators, typed `GithubApiError`/`GithubAuthError`); collectors accept an injected `GithubClient` for offline testing. Other registries use the simple clients in `src/lib/api-clients/`.
 2. **Dashboard** (`src/app/`): pages are client components that fetch from the API routes in `src/app/api/`, which are thin read-only queries over the same SQLite tables. Charts use Recharts via wrappers in `src/components/charts/`.
 
-### Schema is defined in TWO places — keep them in sync
+### Schema single source of truth
 
-- `src/lib/db/schema.ts` — Drizzle table definitions used by all queries.
-- `src/lib/db/migrate.ts` — hand-written, idempotent raw SQL (`CREATE TABLE IF NOT EXISTS`) that is the **actual** migration mechanism, run by `npm run db:migrate` and at the start of every collect run.
-
-`drizzle.config.ts` exists but drizzle-kit generated migrations are not used. When adding a table or column, update both files.
+`src/lib/db/schema.ts` is the ONLY schema authority — tables, indexes, UNIQUE
+and CHECK constraints, and DDL defaults all live there. Migrations are
+generated from it: after editing the schema run `npx drizzle-kit generate`,
+review the new SQL file in `drizzle/`, and commit it (plus `drizzle/meta/`).
+`npm run db:migrate` (and every collect run) applies pending migrations via
+Drizzle's migrator. The baseline migration `drizzle/0000_baseline.sql` is
+intentionally idempotent (`IF NOT EXISTS`) so it applies cleanly to
+pre-cutover databases; never hand-edit later migrations. Schema changes are
+gated by `src/lib/db/migrate.test.ts` (equivalence + live-data no-op tests).
+Data seeding (default alert rules) is the `seed-defaults` pipeline step, not
+DDL.
 
 ### Configuration flow
 
