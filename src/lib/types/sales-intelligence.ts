@@ -19,6 +19,8 @@ export type AlertRuleType =
   | "engagement_spike"
   | "new_enterprise_user";
 
+export type CompanySegment = "engaged" | "battleground" | "prospect";
+
 export interface CompanySummary {
   id: number;
   name: string;
