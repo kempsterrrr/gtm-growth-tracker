@@ -11,7 +11,7 @@ process.env.DATABASE_PATH = path.join(
 
 const { runMigrations } = await import("../db/migrate");
 const { scoreCompanies } = await import("./company-scoring");
-const { todayIso } = await import("../dates");
+const { todayIso, daysAgoIso } = await import("../dates");
 
 runMigrations();
 
@@ -160,6 +160,81 @@ describe("scoreCompanies with competitor attribution", () => {
 
     expect(aggregate("competitor")).toBe(34); // unchanged — u3's competitor issue excluded
     expect(aggregate("own")).toBe(21); // 18 + u3's star (1) + breadth for a 3rd user (2)
+  });
+
+  it("decays engagement by age on both scopes; depends-on keeps full weight forever", async () => {
+    // Fresh company with precisely-aged events: ages at exact half-life
+    // multiples make the decayed contributions exact.
+    run("INSERT INTO companies (name, domain) VALUES ('Recencio', 'recencio.io')");
+    const recencio = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='Recencio'").get() as { id: number }
+    ).id;
+    run("INSERT INTO github_users (login) VALUES ('u4')");
+    const u4 = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='u4'").get() as { id: number }
+    ).id;
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      u4,
+      recencio
+    );
+    const datedEvent = (repoId: number, userId: number, type: string, eventId: string, date: string) =>
+      run(
+        "INSERT INTO github_engagement_events (repo_id, user_id, event_type, github_event_id, event_date) VALUES (?, ?, ?, ?, ?)",
+        repoId,
+        userId,
+        type,
+        eventId,
+        date
+      );
+    datedEvent(rivalRepoId, u4, "issue", "issue-old", daysAgoIso(90)); // one half-life: 8 × 0.5 = 4
+    datedEvent(ownRepoId, u4, "star", "star-older", daysAgoIso(180)); // two half-lives: 1 × 0.25 = 0.25
+    // Depends-on from two years ago — a dependency is current state, undecayed.
+    run(
+      "INSERT INTO company_competitor_signals (company_id, package_id, signal_type, dependent_name, first_seen) VALUES (?, ?, 'depends_on', 'recencio-app', ?)",
+      recencio,
+      rivalPkgId,
+      daysAgoIso(700)
+    );
+
+    await scoreCompanies();
+    const agg = (scope: string) =>
+      sqlite
+        .prepare(
+          "SELECT score FROM company_scores WHERE company_id = ? AND repo_id IS NULL AND scope = ? AND date = ?"
+        )
+        .get(recencio, scope, todayIso()) as { score: number } | undefined;
+
+    expect(agg("competitor")?.score).toBe(18); // 4 decayed issue + 2 breadth + 12 undecayed signal
+    expect(agg("own")?.score).toBe(2.25); // 0.25 decayed star + 2 breadth
+  });
+
+  it("skips events past the max age entirely — fully-cooled companies carry no aggregate", async () => {
+    run("INSERT INTO companies (name, domain) VALUES ('Ancient Ltd', 'ancient.io')");
+    const ancient = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='Ancient Ltd'").get() as { id: number }
+    ).id;
+    run("INSERT INTO github_users (login) VALUES ('u5')");
+    const u5 = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='u5'").get() as { id: number }
+    ).id;
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      u5,
+      ancient
+    );
+    run(
+      "INSERT INTO github_engagement_events (repo_id, user_id, event_type, github_event_id, event_date) VALUES (?, ?, 'issue', 'issue-ancient', ?)",
+      rivalRepoId,
+      u5,
+      daysAgoIso(400)
+    );
+
+    await scoreCompanies();
+    const rows = sqlite
+      .prepare("SELECT scope FROM company_scores WHERE company_id = ? AND repo_id IS NULL")
+      .all(ancient) as Array<{ scope: string }>;
+    expect(rows).toEqual([]); // 400d-old issue contributes nothing; no breadth; no row
   });
 
   it("never writes a competitor aggregate for the competitor's own company", async () => {

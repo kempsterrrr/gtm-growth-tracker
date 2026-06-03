@@ -10,9 +10,24 @@ import {
   DEPENDS_ON_WEIGHT,
 } from "../types/scoring";
 import { readConfig } from "../config/gtm-config";
+import {
+  decayMultiplier,
+  eventAgeDays,
+  DECAY_HALF_LIFE_DAYS,
+  DECAY_MAX_AGE_DAYS,
+  MIN_AGGREGATE_SCORE,
+} from "../decay";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
 import { todayIso } from "../dates";
+
+/** Recency knobs — parameterized so issue #37 can thread configured values;
+ *  the defaults are the grilled PRD #34 numbers. */
+export interface ScoringKnobs {
+  halfLifeDays?: number;
+  maxAgeDays?: number;
+  minAggregateScore?: number;
+}
 
 /** Configured competitor domains, gracefully empty without a config file
  *  (the config module stays the only YAML reader). */
@@ -43,7 +58,10 @@ const emptyTotals = (): ScopeTotals => ({
   score: 0, users: 0, stars: 0, forks: 0, issues: 0, prs: 0, commits: 0,
 });
 
-export async function scoreCompanies() {
+export async function scoreCompanies(knobs: ScoringKnobs = {}) {
+  const halfLife = knobs.halfLifeDays ?? DECAY_HALF_LIFE_DAYS;
+  const maxAge = knobs.maxAgeDays ?? DECAY_MAX_AGE_DAYS;
+  const minScore = knobs.minAggregateScore ?? MIN_AGGREGATE_SCORE;
   const db = getDb();
   const today = todayIso();
   const allCompanies = db.select().from(companies).all();
@@ -124,26 +142,40 @@ export async function scoreCompanies() {
       for (const userId of userIds) {
         // Competitor employees never contribute to competitor-scope scores.
         if (scope === "competitor" && taggedUserIds.has(userId)) continue;
-        // Get engagement events for this user on this repo
+        // Individual events (newest first) — recency decay needs each
+        // event's age, not just per-type counts.
         const events = db.select({
           eventType: githubEngagementEvents.eventType,
-          count: sql<number>`COUNT(*)`,
+          eventDate: githubEngagementEvents.eventDate,
+          collectedAt: githubEngagementEvents.collectedAt,
         })
           .from(githubEngagementEvents)
           .where(sql`${githubEngagementEvents.userId} = ${userId} AND ${githubEngagementEvents.repoId} = ${repo.id}`)
-          .groupBy(githubEngagementEvents.eventType)
+          .orderBy(sql`${githubEngagementEvents.eventDate} IS NULL, ${githubEngagementEvents.eventDate} DESC`)
           .all();
 
         if (events.length === 0) continue;
 
-        let userScore = 0;
+        // The per-type cap keeps the MOST RECENT events (best possible value
+        // under decay), preserving the old cap's anti-spam intent.
+        const byType = new Map<EngagementEventType, typeof events>();
         for (const e of events) {
           const type = e.eventType as EngagementEventType;
-          const weight = weights[type] || 0;
-          const capped = Math.min(e.count, MAX_EVENTS_PER_TYPE);
-          userScore += capped * weight;
+          if (!byType.has(type)) byType.set(type, []);
+          byType.get(type)!.push(e);
+        }
 
-          // Track type counts (facts, recorded regardless of weight)
+        let userScore = 0;
+        for (const [type, typeEvents] of byType) {
+          const weight = weights[type] || 0;
+          const kept = typeEvents.slice(0, MAX_EVENTS_PER_TYPE);
+          for (const e of kept) {
+            const age = eventAgeDays(e.eventDate, e.collectedAt, today);
+            userScore += weight * decayMultiplier(age, halfLife, maxAge);
+          }
+          const capped = kept.length;
+
+          // Track type counts (raw facts, recorded regardless of decay)
           if (type === "star") repoStars += capped;
           else if (type === "fork") repoForks += capped;
           else if (type === "issue" || type === "issue_comment") repoIssues += capped;
@@ -196,30 +228,33 @@ export async function scoreCompanies() {
     // Aggregate rows (repo_id NULL): delete-then-insert. SQLite treats NULLs
     // as distinct in the (company_id, repo_id, date) unique index, so the old
     // upsert never conflicted and same-day re-runs duplicated aggregates —
-    // replacing the day's rows fixes that and gives one row per scope.
-    if (totals.own.score > 0 || totals.competitor.score > 0) {
-      db.delete(companyScores)
-        .where(
-          sql`${companyScores.companyId} = ${company.id} AND ${companyScores.repoId} IS NULL AND ${companyScores.date} = ${today}`
-        )
+    // replacing the day's rows fixes that and gives one row per scope. The
+    // delete runs unconditionally so a same-day rescore under stricter knobs
+    // clears rows that no longer meet the floor.
+    db.delete(companyScores)
+      .where(
+        sql`${companyScores.companyId} = ${company.id} AND ${companyScores.repoId} IS NULL AND ${companyScores.date} = ${today}`
+      )
+      .run();
+    let wrote = false;
+    for (const scope of ["own", "competitor"] as const) {
+      const t = totals[scope];
+      // Below the floor = no signal: no row, and the segment drops (PRD #34).
+      if (t.score < minScore) continue;
+      // The competitor itself gets no competitor aggregate — it must never
+      // surface as its own prospect or battleground.
+      if (scope === "competitor" && isCompetitorCompany(company)) continue;
+      db.insert(companyScores)
+        .values({
+          companyId: company.id, repoId: null, scope, date: today,
+          score: t.score, userCount: t.users,
+          starCount: t.stars, forkCount: t.forks,
+          issueCount: t.issues, prCount: t.prs, commitCount: t.commits,
+        })
         .run();
-      for (const scope of ["own", "competitor"] as const) {
-        const t = totals[scope];
-        if (t.score <= 0) continue;
-        // The competitor itself gets no competitor aggregate — it must never
-        // surface as its own prospect or battleground.
-        if (scope === "competitor" && isCompetitorCompany(company)) continue;
-        db.insert(companyScores)
-          .values({
-            companyId: company.id, repoId: null, scope, date: today,
-            score: t.score, userCount: t.users,
-            starCount: t.stars, forkCount: t.forks,
-            issueCount: t.issues, prCount: t.prs, commitCount: t.commits,
-          })
-          .run();
-      }
-      scored++;
+      wrote = true;
     }
+    if (wrote) scored++;
   }
 
   console.log(`[scoring] Scored ${scored} companies`);
