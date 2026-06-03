@@ -73,7 +73,9 @@ commits/PRs 0 — supply signals identify employees, not prospects). Segments
 (engaged / battleground / prospect) are derived at query time via
 `src/lib/segments.ts`, never stored. Aggregate reads (companies API, alert
 rules) must pin a scope — own-engagement semantics never blend with
-competitor engagement.
+competitor engagement. The Companies UI derives its filter/sort/phrasing in
+`src/app/companies/transforms.ts` (exported, unit-tested); the detail API's
+`competitorAttribution` exposes the latest per-repo competitor score rows.
 
 ### Deployment & data lifecycle
 
