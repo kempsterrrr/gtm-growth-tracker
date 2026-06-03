@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/charts/MetricCard";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
+import { toIsoDate } from "@/lib/dates";
 import type { EventCategory } from "@/lib/types/events";
 
 interface NpmPackage {
@@ -35,7 +36,7 @@ function aggregateWeekly(data: DownloadRow[]): Record<string, string | number>[]
     const date = new Date(d.date);
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
-    const key = weekStart.toISOString().split("T")[0];
+    const key = toIsoDate(weekStart);
     weeks[key] = (weeks[key] || 0) + d.downloads;
   }
   return Object.entries(weeks).map(([date, downloads]) => ({ date, downloads }));

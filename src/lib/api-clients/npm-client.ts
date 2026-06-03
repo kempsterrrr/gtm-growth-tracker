@@ -1,3 +1,4 @@
+import { toIsoDate as formatDate } from "../dates";
 export interface NpmDownloadPoint {
   downloads: number;
   day: string;
@@ -80,9 +81,7 @@ export async function getNpmPointDownloads(
   return resp.json();
 }
 
-function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
+
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

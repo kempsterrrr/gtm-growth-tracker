@@ -5,10 +5,11 @@ import {
 import { ENGAGEMENT_WEIGHTS, BREADTH_BONUS_PER_USER, MAX_EVENTS_PER_TYPE } from "../types/scoring";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
+import { todayIso } from "../dates";
 
 export async function scoreCompanies() {
   const db = getDb();
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIso();
   const allCompanies = db.select().from(companies).all();
   const allRepos = db.select().from(trackedRepos).all();
 

@@ -2,6 +2,7 @@ import { getDb } from "../db/client";
 import { alertRules, alertEvents, companyScores, companies, githubUserEmails } from "../db/schema";
 import { sql } from "drizzle-orm";
 import type { AlertRuleConfig } from "../types/sales-intelligence";
+import { todayIso, daysAgoIso } from "../dates";
 
 export async function evaluateAlerts() {
   const db = getDb();
@@ -9,7 +10,7 @@ export async function evaluateAlerts() {
 
   if (rules.length === 0) return;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayIso();
   let fired = 0;
 
   for (const rule of rules) {
@@ -62,7 +63,7 @@ export async function evaluateAlerts() {
     if (rule.ruleType === "engagement_spike") {
       const pctIncrease = config.percent_increase || 100;
       const windowDays = config.window_days || 7;
-      const compareDate = new Date(Date.now() - windowDays * 86400000).toISOString().split("T")[0];
+      const compareDate = daysAgoIso(windowDays);
 
       const current = db.select({
         companyId: companyScores.companyId,
