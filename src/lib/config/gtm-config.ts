@@ -33,6 +33,7 @@ const trackedRepoConfigSchema = z.object({
   owner: z.string().min(1),
   name: z.string().min(1),
   display_name: z.string().optional(),
+  competitor: z.string().min(1).optional(),
 });
 
 const trackedPackageConfigSchema = z.object({
@@ -42,6 +43,7 @@ const trackedPackageConfigSchema = z.object({
     .string()
     .regex(/^[^\s/]+\/[^\s/]+$/, 'must be "owner/name"')
     .optional(),
+  competitor: z.string().min(1).optional(),
 });
 
 export const gtmConfigSchema = z.object({
@@ -117,6 +119,7 @@ export function addRepo(repo: TrackedRepoConfig, configPath = defaultConfigPath(
   );
   if (existing) {
     existing.display_name = parsed.data.display_name ?? existing.display_name;
+    existing.competitor = parsed.data.competitor ?? existing.competitor;
   } else {
     config.github.repos.push(parsed.data);
   }
@@ -144,6 +147,7 @@ export function addPackage(
   if (existing) {
     existing.display_name = parsed.data.display_name ?? existing.display_name;
     existing.github_repo = parsed.data.github_repo ?? existing.github_repo;
+    existing.competitor = parsed.data.competitor ?? existing.competitor;
   } else {
     list.push(parsed.data);
   }
@@ -164,10 +168,18 @@ export function syncToDatabase(configPath = defaultConfigPath()): void {
 
   for (const repo of config.github.repos) {
     db.insert(trackedRepos)
-      .values({ owner: repo.owner, name: repo.name, displayName: repo.display_name || null })
+      .values({
+        owner: repo.owner,
+        name: repo.name,
+        displayName: repo.display_name || null,
+        competitor: repo.competitor || null,
+      })
       .onConflictDoUpdate({
         target: [trackedRepos.owner, trackedRepos.name],
-        set: { displayName: sql`excluded.display_name` },
+        set: {
+          displayName: sql`excluded.display_name`,
+          competitor: sql`excluded.competitor`,
+        },
       })
       .run();
   }
@@ -185,12 +197,19 @@ export function syncToDatabase(configPath = defaultConfigPath()): void {
         if (repo) repoId = repo.id;
       }
       db.insert(trackedPackages)
-        .values({ registry, name: pkg.name, displayName: pkg.display_name || null, repoId })
+        .values({
+          registry,
+          name: pkg.name,
+          displayName: pkg.display_name || null,
+          repoId,
+          competitor: pkg.competitor || null,
+        })
         .onConflictDoUpdate({
           target: [trackedPackages.registry, trackedPackages.name],
           set: {
             displayName: sql`excluded.display_name`,
             repoId: repoId ? sql`${repoId}` : sql`repo_id`,
+            competitor: sql`excluded.competitor`,
           },
         })
         .run();

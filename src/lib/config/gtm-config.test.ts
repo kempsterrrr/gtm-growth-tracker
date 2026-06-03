@@ -134,3 +134,47 @@ describe("syncToDatabase", () => {
     expect(() => syncToDatabase(path.join(tmp, "missing.yaml"))).not.toThrow();
   });
 });
+
+describe("competitor attribution (entry-level)", () => {
+  it("round-trips competitor on repos and packages through YAML and DB projection", () => {
+    const p = freshConfig();
+    addRepo({ owner: "them", name: "their-repo", competitor: "Acme" }, p);
+    addPackage("npm", { name: "acme-sdk", competitor: "Acme" }, p);
+
+    const config = readConfig(p);
+    expect(config.github.repos.find((r) => r.name === "their-repo")?.competitor).toBe("Acme");
+    expect(config.packages.npm.find((x) => x.name === "acme-sdk")?.competitor).toBe("Acme");
+
+    const repoRow = sqlite
+      .prepare("SELECT competitor FROM tracked_repos WHERE owner = 'them' AND name = 'their-repo'")
+      .get() as { competitor: string | null };
+    expect(repoRow.competitor).toBe("Acme");
+    const pkgRow = sqlite
+      .prepare("SELECT competitor FROM tracked_packages WHERE registry = 'npm' AND name = 'acme-sdk'")
+      .get() as { competitor: string | null };
+    expect(pkgRow.competitor).toBe("Acme");
+  });
+
+  it("projects one-directionally: removing competitor from YAML nulls the DB column on re-sync", () => {
+    const p = path.join(tmp, "one-directional.yaml");
+    const withCompetitor = `github:
+  repos:
+    - owner: flip
+      name: flop
+      competitor: Acme
+`;
+    writeFileSync(p, withCompetitor);
+    syncToDatabase(p);
+    const before = sqlite
+      .prepare("SELECT competitor FROM tracked_repos WHERE owner = 'flip' AND name = 'flop'")
+      .get() as { competitor: string | null };
+    expect(before.competitor).toBe("Acme");
+
+    writeFileSync(p, withCompetitor.replace("      competitor: Acme\n", ""));
+    syncToDatabase(p);
+    const after = sqlite
+      .prepare("SELECT competitor FROM tracked_repos WHERE owner = 'flip' AND name = 'flop'")
+      .get() as { competitor: string | null };
+    expect(after.competitor).toBeNull();
+  });
+});
