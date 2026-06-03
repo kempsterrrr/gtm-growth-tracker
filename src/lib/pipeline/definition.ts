@@ -9,6 +9,7 @@ import { collectGithubEngagement } from "../collectors/github-engagement";
 import { collectUserEnrichment } from "../collectors/github-user-enrichment";
 import { collectCommitEmails } from "../collectors/github-commit-emails";
 import { resolveCompanies } from "../collectors/company-resolution";
+import { resolveCompetitorDependents } from "../collectors/competitor-dependents";
 import { scoreCompanies } from "../collectors/company-scoring";
 import { evaluateAlerts } from "../collectors/alerts-evaluator";
 import { sendAlertNotifications } from "../collectors/slack-notifier";
@@ -52,7 +53,19 @@ export const pipelineSteps: PipelineStep[] = [
     dependsOn: ["github-commit-emails"],
     run: () => resolveCompanies(),
   },
-  { name: "company-scoring", dependsOn: ["company-resolution"], run: () => scoreCompanies() },
+  {
+    // The depends-on-competitor signal: reads reverse_dependencies persisted
+    // by prior deps-dev runs (no hard edge on deps-dev — a flaky deps.dev day
+    // must not skip the scoring chain; new dependents lag at most one run).
+    name: "resolve-competitor-dependents",
+    dependsOn: ["config-sync"],
+    run: () => resolveCompetitorDependents(),
+  },
+  {
+    name: "company-scoring",
+    dependsOn: ["company-resolution", "resolve-competitor-dependents"],
+    run: () => scoreCompanies(),
+  },
   {
     name: "alerts-evaluator",
     dependsOn: ["company-scoring", "seed-defaults"],

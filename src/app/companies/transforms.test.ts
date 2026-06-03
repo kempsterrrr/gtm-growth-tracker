@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { filterCompanies, sortCompanies, formatEngagementBreakdown } from "./transforms";
+import {
+  filterCompanies,
+  sortCompanies,
+  formatEngagementBreakdown,
+  formatDependentCount,
+} from "./transforms";
 import type { CompanySummary } from "@/lib/types/api";
 
 const company = (over: Partial<CompanySummary>): CompanySummary => ({
@@ -89,5 +94,12 @@ describe("formatEngagementBreakdown", () => {
         commitCount: 0,
       })
     ).toBe("no engagement recorded");
+  });
+});
+
+describe("formatDependentCount", () => {
+  it("handles singular and plural", () => {
+    expect(formatDependentCount(1)).toBe("1 dependent repo");
+    expect(formatDependentCount(3)).toBe("3 dependent repos");
   });
 });

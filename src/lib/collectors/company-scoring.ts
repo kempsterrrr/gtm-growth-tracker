@@ -1,9 +1,11 @@
 import { getDb } from "../db/client";
 import {
   companies, githubUserCompanies, githubEngagementEvents, companyScores, trackedRepos,
+  companyCompetitorSignals,
 } from "../db/schema";
 import {
   ENGAGEMENT_WEIGHTS, COMPETITOR_ENGAGEMENT_WEIGHTS, BREADTH_BONUS_PER_USER, MAX_EVENTS_PER_TYPE,
+  DEPENDS_ON_WEIGHT,
 } from "../types/scoring";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
@@ -39,7 +41,21 @@ export async function scoreCompanies() {
       .where(sql`${githubUserCompanies.companyId} = ${company.id}`)
       .all();
 
-    if (userLinks.length === 0) continue;
+    // Depends-on-competitor signals (issue #22): the strongest prospect
+    // signal, capped per package like engagement types. Companies with
+    // signals but no linked users still get scored (net-new prospects from
+    // package dependents alone).
+    const signalCounts = db
+      .select({
+        packageId: companyCompetitorSignals.packageId,
+        n: sql<number>`COUNT(*)`,
+      })
+      .from(companyCompetitorSignals)
+      .where(sql`${companyCompetitorSignals.companyId} = ${company.id}`)
+      .groupBy(companyCompetitorSignals.packageId)
+      .all();
+
+    if (userLinks.length === 0 && signalCounts.length === 0) continue;
     const userIds = userLinks.map((u) => u.userId);
 
     // Two aggregates that never blend: own-engagement and competitor-engagement
@@ -122,6 +138,10 @@ export async function scoreCompanies() {
       t.users = Math.max(t.users, repoUsers);
       t.stars += repoStars; t.forks += repoForks;
       t.issues += repoIssues; t.prs += repoPrs; t.commits += repoCommits;
+    }
+
+    for (const s of signalCounts) {
+      totals.competitor.score += Math.min(s.n, MAX_EVENTS_PER_TYPE) * DEPENDS_ON_WEIGHT;
     }
 
     // Aggregate rows (repo_id NULL): delete-then-insert. SQLite treats NULLs

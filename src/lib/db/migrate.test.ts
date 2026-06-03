@@ -444,6 +444,24 @@ describe("schema equivalence (upgrade-path gate)", () => {
     expect(col).toEqual([{ name: "scope", notnull: 1, dflt: "'own'" }]);
     db.close();
   });
+
+  it("the migrations add the competitor-signals table", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "signals.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const cols = (
+      db.prepare("PRAGMA table_info(company_competitor_signals)").all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    expect(cols).toEqual([
+      "id",
+      "company_id",
+      "package_id",
+      "signal_type",
+      "dependent_name",
+      "first_seen",
+    ]);
+    db.close();
+  });
 });
 
 describe("live-data migration (hard gate)", () => {
@@ -461,7 +479,15 @@ describe("live-data migration (hard gate)", () => {
     runMigrations();
 
     const db = new Database(copy);
-    expect(rowCounts(db)).toEqual(before);
+    const after = rowCounts(db);
+    // No data loss: every pre-existing table keeps every row. Tables ADDED
+    // by migrations are allowed — but must start empty (pure DDL).
+    for (const [table, n] of Object.entries(before)) {
+      expect(after[table], table).toBe(n);
+    }
+    for (const [table, n] of Object.entries(after)) {
+      if (!(table in before)) expect(n, `${table} should start empty`).toBe(0);
+    }
     const applied = db.prepare("SELECT COUNT(*) AS n FROM __drizzle_migrations").get() as {
       n: number;
     };

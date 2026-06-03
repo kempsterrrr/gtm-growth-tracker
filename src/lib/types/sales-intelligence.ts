@@ -57,9 +57,13 @@ export interface CompanyDetail extends Omit<CompanySummary, "scoreTrend"> {
  *  competitor product the company is using. */
 export interface CompetitorAttributionRow {
   competitor: string;
-  /** Repo as "owner/name" (package name once #22 lands). */
+  /** Repo as "owner/name"; package as registry name. */
   entity: string;
   displayName: string | null;
+  /** How the signal was observed: repo engagement or package dependency. */
+  signal: "engagement" | "depends_on";
+  /** Dependent count behind a depends_on row; 0 for engagement rows. */
+  dependentCount: number;
   score: number;
   userCount: number;
   starCount: number;

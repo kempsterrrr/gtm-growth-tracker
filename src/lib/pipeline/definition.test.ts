@@ -12,9 +12,9 @@ const { pipelineSteps } = await import("./definition");
 const { validatePipeline } = await import("./runner");
 
 describe("pipelineSteps", () => {
-  it("registers 14 uniquely-named steps (config-sync + seed-defaults + 12 collectors)", () => {
-    expect(pipelineSteps).toHaveLength(14);
-    expect(new Set(pipelineSteps.map((s) => s.name)).size).toBe(14);
+  it("registers 15 uniquely-named steps (config-sync + seed-defaults + 13 collectors)", () => {
+    expect(pipelineSteps).toHaveLength(15);
+    expect(new Set(pipelineSteps.map((s) => s.name)).size).toBe(15);
   });
 
   it("registers the expected step names", () => {
@@ -31,11 +31,17 @@ describe("pipelineSteps", () => {
         "github-user-enrichment",
         "github-commit-emails",
         "company-resolution",
+        "resolve-competitor-dependents",
         "company-scoring",
         "alerts-evaluator",
         "slack-notifier",
       ].sort()
     );
+  });
+
+  it("scoring waits for the depends-on signal step", () => {
+    const scoring = pipelineSteps.find((s) => s.name === "company-scoring")!;
+    expect(scoring.dependsOn).toContain("resolve-competitor-dependents");
   });
 
   it("has resolvable, acyclic dependencies", () => {

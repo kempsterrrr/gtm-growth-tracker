@@ -369,6 +369,33 @@ export const companyScores = sqliteTable(
   ]
 );
 
+export const companyCompetitorSignals = sqliteTable(
+  "company_competitor_signals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companies.id),
+    packageId: integer("package_id")
+      .notNull()
+      .references(() => trackedPackages.id),
+    signalType: text("signal_type", { enum: ["depends_on"] })
+      .notNull()
+      .default("depends_on"),
+    dependentName: text("dependent_name").notNull(),
+    firstSeen: text("first_seen").notNull(),
+  },
+  (table) => [
+    unique("company_competitor_signals_unique").on(
+      table.companyId,
+      table.packageId,
+      table.dependentName
+    ),
+    index("idx_company_competitor_signals_company").on(table.companyId),
+    check("company_competitor_signals_type_check", sql`${table.signalType} IN ('depends_on')`),
+  ]
+);
+
 export const alertRules = sqliteTable(
   "alert_rules",
   {
