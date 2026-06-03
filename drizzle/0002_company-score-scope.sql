@@ -1,0 +1,1 @@
+ALTER TABLE `company_scores` ADD `scope` text DEFAULT 'own' NOT NULL;

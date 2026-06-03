@@ -19,6 +19,8 @@ export type AlertRuleType =
   | "engagement_spike"
   | "new_enterprise_user";
 
+export type CompanySegment = "engaged" | "battleground" | "prospect";
+
 export interface CompanySummary {
   id: number;
   name: string;
@@ -26,14 +28,19 @@ export interface CompanySummary {
   website: string | null;
   industry: string | null;
   employeeCount: string | null;
+  /** Own-engagement aggregate — same meaning as before dual scoring. */
   score: number;
+  /** Competitor-engagement aggregate; 0 when the company has none. */
+  competitorScore: number;
+  /** Derived at query time from the two aggregates (PRD #17 matrix). */
+  segment: CompanySegment;
   userCount: number;
   starCount: number;
   forkCount: number;
   issueCount: number;
   prCount: number;
   commitCount: number;
-  scoreTrend: number; // change vs 7 days ago
+  scoreTrend: number; // change vs 7 days ago (own score)
 }
 
 // The detail route does not compute scoreTrend — the contract matches reality

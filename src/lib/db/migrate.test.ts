@@ -427,6 +427,23 @@ describe("schema equivalence (upgrade-path gate)", () => {
     expect(competitorCol("tracked_packages")).toEqual([{ name: "competitor", notnull: 0 }]);
     db.close();
   });
+
+  it("the migrations add the scoped company-score column", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "columns-scope.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const col = (
+      db.prepare("PRAGMA table_info(company_scores)").all() as Array<{
+        name: string;
+        notnull: number;
+        dflt_value: string | null;
+      }>
+    )
+      .filter((c) => c.name === "scope")
+      .map((c) => ({ name: c.name, notnull: c.notnull, dflt: c.dflt_value }));
+    expect(col).toEqual([{ name: "scope", notnull: 1, dflt: "'own'" }]);
+    db.close();
+  });
 });
 
 describe("live-data migration (hard gate)", () => {

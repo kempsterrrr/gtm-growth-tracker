@@ -5,6 +5,7 @@ import {
   companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents,
 } from "@/lib/db/schema";
 import { sql, desc } from "drizzle-orm";
+import { deriveSegment } from "@/lib/segments";
 
 export async function GET(
   request: NextRequest,
@@ -19,20 +20,27 @@ export async function GET(
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  // Latest aggregate score
-  const latestScore = db
-    .select()
-    .from(companyScores)
-    .where(sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NULL`)
-    .orderBy(desc(companyScores.date))
-    .limit(1)
-    .get();
+  // Latest aggregate per scope (`id DESC` tiebreaks legacy duplicate rows)
+  const latestAggregate = (scope: "own" | "competitor") =>
+    db
+      .select()
+      .from(companyScores)
+      .where(
+        sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NULL AND ${companyScores.scope} = ${scope}`
+      )
+      .orderBy(desc(companyScores.date), desc(companyScores.id))
+      .limit(1)
+      .get();
+  const latestScore = latestAggregate("own");
+  const latestCompetitorScore = latestAggregate("competitor");
 
-  // Score history
+  // Score history (own scope — competitor aggregates never blend in)
   const scoreHistory = db
     .select({ date: companyScores.date, score: companyScores.score })
     .from(companyScores)
-    .where(sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NULL`)
+    .where(
+      sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NULL AND ${companyScores.scope} = 'own'`
+    )
     .orderBy(companyScores.date)
     .all();
 
@@ -77,9 +85,13 @@ export async function GET(
     };
   });
 
+  const ownScore = latestScore?.score || 0;
+  const competitorScore = latestCompetitorScore?.score || 0;
   const payload: CompanyDetail = {
     ...company,
-    score: latestScore?.score || 0,
+    score: ownScore,
+    competitorScore,
+    segment: deriveSegment(ownScore, competitorScore),
     userCount: latestScore?.userCount || 0,
     starCount: latestScore?.starCount || 0,
     forkCount: latestScore?.forkCount || 0,

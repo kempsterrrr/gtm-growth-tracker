@@ -63,6 +63,18 @@ totals derived from them — exclude competitor-attributed entities
 (`competitor IS NULL`); detail-by-id endpoints intentionally still serve them
 (the competitor compare overlay depends on this).
 
+Scoring: `company_scores` carries a `scope` discriminator (`own` |
+`competitor`) — per-repo rows are stamped from the repo's attribution, and
+aggregate rows (`repo_id IS NULL`) are written one-per-scope via
+delete-then-insert (the NULL repo_id never hits the unique index, so upserts
+would duplicate). The weight table is selected per repo
+(`COMPETITOR_ENGAGEMENT_WEIGHTS`: issues high, forks medium, stars low,
+commits/PRs 0 — supply signals identify employees, not prospects). Segments
+(engaged / battleground / prospect) are derived at query time via
+`src/lib/segments.ts`, never stored. Aggregate reads (companies API, alert
+rules) must pin a scope — own-engagement semantics never blend with
+competitor engagement.
+
 ### Deployment & data lifecycle
 
 - The SQLite DB (`data/gtm-tracker.db`) is **committed to git**: the daily workflow (`.github/workflows/collect-daily.yml`) runs the collector at 6 AM UTC and pushes the updated DB. Expect upstream commits touching `data/`.

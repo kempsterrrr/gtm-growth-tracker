@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { companies, companyScores } from "@/lib/db/schema";
 import { sql, desc } from "drizzle-orm";
-import { todayIso, daysAgoIso } from "@/lib/dates";
+import { daysAgoIso } from "@/lib/dates";
+import { deriveSegment } from "@/lib/segments";
 import type { CompanySummary } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
@@ -12,55 +13,69 @@ export async function GET(request: NextRequest) {
   const minScore = parseFloat(searchParams.get("minScore") || "0");
 
   const db = getDb();
-  const today = todayIso();
   const sevenDaysAgo = daysAgoIso(7);
 
-  // Get companies with their latest aggregate scores
-  const results = db
-    .select({
-      id: companies.id,
-      name: companies.name,
-      domain: companies.domain,
-      website: companies.website,
-      industry: companies.industry,
-      employeeCount: companies.employeeCount,
-      score: companyScores.score,
-      userCount: companyScores.userCount,
-      starCount: companyScores.starCount,
-      forkCount: companyScores.forkCount,
-      issueCount: companyScores.issueCount,
-      prCount: companyScores.prCount,
-      commitCount: companyScores.commitCount,
-    })
-    .from(companyScores)
-    .innerJoin(companies, sql`${companyScores.companyId} = ${companies.id}`)
-    .where(
-      sql`${companyScores.repoId} IS NULL AND ${companyScores.date} = (
-        SELECT MAX(date) FROM company_scores WHERE company_id = ${companies.id} AND repo_id IS NULL
-      ) AND ${companyScores.score} >= ${minScore}`
-    )
-    .orderBy(desc(companyScores.score))
-    .limit(limit)
-    .offset(offset)
-    .all();
+  // Latest aggregate per scope. `id DESC` tiebreaks the pre-scope duplicate
+  // aggregate rows (NULL repo_id never hit the unique index) deterministically.
+  const latestAggregate = (companyId: number, scope: "own" | "competitor") =>
+    db
+      .select()
+      .from(companyScores)
+      .where(
+        sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NULL AND ${companyScores.scope} = ${scope}`
+      )
+      .orderBy(desc(companyScores.date), desc(companyScores.id))
+      .limit(1)
+      .get();
 
-  // Add trend data
-  const withTrend: CompanySummary[] = results.map((r) => {
+  const allCompanies = db.select().from(companies).all();
+  const summaries: CompanySummary[] = [];
+
+  for (const company of allCompanies) {
+    const own = latestAggregate(company.id, "own");
+    const competitor = latestAggregate(company.id, "competitor");
+    if (!own && !competitor) continue;
+
+    const ownScore = own?.score || 0;
+    const competitorScore = competitor?.score || 0;
+    if (Math.max(ownScore, competitorScore) < minScore) continue;
+
+    // Trend stays own-based — same meaning as before dual scoring.
     const prevScore = db
       .select({ score: companyScores.score })
       .from(companyScores)
       .where(
-        sql`${companyScores.companyId} = ${r.id} AND ${companyScores.repoId} IS NULL AND ${companyScores.date} <= ${sevenDaysAgo}`
+        sql`${companyScores.companyId} = ${company.id} AND ${companyScores.repoId} IS NULL AND ${companyScores.scope} = 'own' AND ${companyScores.date} <= ${sevenDaysAgo}`
       )
-      .orderBy(desc(companyScores.date))
+      .orderBy(desc(companyScores.date), desc(companyScores.id))
       .limit(1)
       .get();
 
-    return {
-      ...r,
-      scoreTrend: prevScore ? r.score - prevScore.score : 0,
-    };
-  });
+    summaries.push({
+      id: company.id,
+      name: company.name,
+      domain: company.domain,
+      website: company.website,
+      industry: company.industry,
+      employeeCount: company.employeeCount,
+      score: ownScore,
+      competitorScore,
+      segment: deriveSegment(ownScore, competitorScore),
+      userCount: own?.userCount || 0,
+      starCount: own?.starCount || 0,
+      forkCount: own?.forkCount || 0,
+      issueCount: own?.issueCount || 0,
+      prCount: own?.prCount || 0,
+      commitCount: own?.commitCount || 0,
+      scoreTrend: own && prevScore ? own.score - prevScore.score : 0,
+    });
+  }
 
-  return NextResponse.json(withTrend);
+  // The stronger signal wins the default ordering so net-new prospects
+  // surface next to hot own-engagement companies.
+  summaries.sort(
+    (a, b) => Math.max(b.score, b.competitorScore) - Math.max(a.score, a.competitorScore)
+  );
+
+  return NextResponse.json(summaries.slice(offset, offset + limit));
 }
