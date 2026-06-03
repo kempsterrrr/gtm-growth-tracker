@@ -50,11 +50,12 @@ export interface GithubRepoSummary {
   owner: string;
   name: string;
   displayName: string | null;
-  stars: number | null;
-  forks: number | null;
-  watchers: number | null;
-  openIssues: number | null;
-  contributors: number | null;
+  // the route coalesces missing metrics to 0, so the wire is non-null
+  stars: number;
+  forks: number;
+  watchers: number;
+  openIssues: number;
+  contributors: number;
 }
 export interface GithubMetricRow {
   date: string;

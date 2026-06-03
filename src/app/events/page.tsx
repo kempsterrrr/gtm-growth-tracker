@@ -12,19 +12,7 @@ import {
   EVENT_CATEGORY_LABELS,
   type EventCategory,
 } from "@/lib/types/events";
-
-interface TrackedEvent {
-  id: number;
-  date: string;
-  title: string;
-  description: string | null;
-  category: EventCategory;
-  source: "auto" | "manual";
-  repoId: number | null;
-  packageId: number | null;
-  metadata: string | null;
-  createdAt: string;
-}
+import type { TrackedEvent } from "@/lib/types/api";
 
 const CATEGORIES: EventCategory[] = [
   "release",

@@ -27,7 +27,7 @@ interface ChartEvent {
   date: string;
   title: string;
   category: EventCategory;
-  description?: string;
+  description?: string | null;
 }
 
 interface TimeSeriesChartProps {

@@ -8,52 +8,17 @@ import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
 import { Star, Download, GitFork, Package } from "lucide-react";
 import type { EventCategory } from "@/lib/types/events";
-
-interface NpmSummary {
-  id: number;
-  name: string;
-  displayName: string | null;
-  downloadsLast7d: number;
-  growthPercent7d: number;
-}
-
-interface GithubSummary {
-  id: number;
-  owner: string;
-  name: string;
-  displayName: string | null;
-  stars: number;
-  forks: number;
-}
-
-interface DepSummary {
-  id: number;
-  name: string;
-  registry: string;
-  dependentCount: number;
-}
-
-interface DownloadRow {
-  date: string;
-  downloads: number;
-}
-
-interface EventRow {
-  date: string;
-  title: string;
-  category: EventCategory;
-  description?: string;
-}
+import type { NpmPackageSummary, GithubRepoSummary, DependencySummary, DownloadRow, TrackedEvent } from "@/lib/types/api";
 
 export default function OverviewPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [npmPackages, setNpmPackages] = useState<NpmSummary[]>([]);
-  const [githubRepos, setGithubRepos] = useState<GithubSummary[]>([]);
-  const [depSummaries, setDepSummaries] = useState<DepSummary[]>([]);
+  const [npmPackages, setNpmPackages] = useState<NpmPackageSummary[]>([]);
+  const [githubRepos, setGithubRepos] = useState<GithubRepoSummary[]>([]);
+  const [depSummaries, setDepSummaries] = useState<DependencySummary[]>([]);
   const [chartData, setChartData] = useState<Record<string, string | number>[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,10 +32,10 @@ export default function OverviewPage() {
           fetch(`/api/events?${buildQueryString()}`),
         ]);
 
-        const npmData: NpmSummary[] = await npmRes.json();
-        const ghData: GithubSummary[] = await ghRes.json();
-        const depData: DepSummary[] = await depRes.json();
-        const eventsData: EventRow[] = await eventsRes.json();
+        const npmData: NpmPackageSummary[] = await npmRes.json();
+        const ghData: GithubRepoSummary[] = await ghRes.json();
+        const depData: DependencySummary[] = await depRes.json();
+        const eventsData: TrackedEvent[] = await eventsRes.json();
 
         setNpmPackages(npmData);
         setGithubRepos(ghData);

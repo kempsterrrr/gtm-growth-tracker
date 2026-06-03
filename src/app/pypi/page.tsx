@@ -7,40 +7,22 @@ import { MetricCard } from "@/components/charts/MetricCard";
 import { Select } from "@/components/ui/select";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
 import type { EventCategory } from "@/lib/types/events";
-
-interface PypiPackage {
-  id: number;
-  name: string;
-  displayName: string | null;
-  downloadsLast7d: number;
-}
-
-interface DownloadRow {
-  date: string;
-  downloads: number;
-  categoryValue: string | null;
-}
-
-interface EventRow {
-  date: string;
-  title: string;
-  category: EventCategory;
-}
+import type { PypiPackageSummary, PypiDownloadRow, TrackedEvent } from "@/lib/types/api";
 
 export default function PypiPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [packages, setPackages] = useState<PypiPackage[]>([]);
+  const [packages, setPackages] = useState<PypiPackageSummary[]>([]);
   const [selectedPkg, setSelectedPkg] = useState("");
-  const [chartData, setChartData] = useState<DownloadRow[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  const [chartData, setChartData] = useState<PypiDownloadRow[]>([]);
+  const [events, setEvents] = useState<TrackedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/metrics/pypi")
       .then((r) => r.json())
-      .then((data: PypiPackage[]) => {
+      .then((data: PypiPackageSummary[]) => {
         setPackages(data);
         if (data.length > 0 && !selectedPkg) {
           setSelectedPkg(String(data[0].id));
@@ -58,7 +40,7 @@ export default function PypiPage() {
       fetch(`/api/metrics/pypi?${qs}`).then((r) => r.json()),
       fetch(`/api/events?${buildQueryString()}`).then((r) => r.json()),
     ])
-      .then(([downloads, evts]: [DownloadRow[], EventRow[]]) => {
+      .then(([downloads, evts]: [PypiDownloadRow[], TrackedEvent[]]) => {
         setChartData(downloads);
         setEvents(evts);
       })

@@ -8,41 +8,22 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
 import { GitFork } from "lucide-react";
-
-interface DepSummary {
-  id: number;
-  name: string;
-  registry: string;
-  displayName: string | null;
-  dependentCount: number;
-}
-
-interface DepCount {
-  date: string;
-  count: number;
-}
-
-interface Dependent {
-  dependentName: string;
-  dependentRegistry: string;
-  dependentVersion: string | null;
-  firstSeen: string;
-}
+import type { DependencySummary, DependencyCountRow, DependentRow } from "@/lib/types/api";
 
 export default function DependenciesPage() {
   const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
     useDashboardFilters();
 
-  const [packages, setPackages] = useState<DepSummary[]>([]);
+  const [packages, setPackages] = useState<DependencySummary[]>([]);
   const [selectedPkg, setSelectedPkg] = useState("");
-  const [counts, setCounts] = useState<DepCount[]>([]);
-  const [dependents, setDependents] = useState<Dependent[]>([]);
+  const [counts, setCounts] = useState<DependencyCountRow[]>([]);
+  const [dependents, setDependents] = useState<DependentRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/metrics/dependencies")
       .then((r) => r.json())
-      .then((data: DepSummary[]) => {
+      .then((data: DependencySummary[]) => {
         setPackages(data);
         if (data.length > 0 && !selectedPkg) {
           setSelectedPkg(String(data[0].id));
@@ -57,7 +38,7 @@ export default function DependenciesPage() {
     const qs = buildQueryString({ packageId: selectedPkg });
     fetch(`/api/metrics/dependencies?${qs}`)
       .then((r) => r.json())
-      .then((data: { counts: DepCount[]; dependents: Dependent[] }) => {
+      .then((data: { counts: DependencyCountRow[]; dependents: DependentRow[] }) => {
         setCounts(data.counts);
         setDependents(data.dependents);
       })
@@ -110,7 +91,7 @@ export default function DependenciesPage() {
         {!loading && counts.length > 0 && (
           <div className="border rounded-lg p-4">
             <h3 className="text-sm font-medium text-muted-foreground mb-4">
-              Dependent Count Over Time
+              DependentRow Count Over Time
             </h3>
             <TimeSeriesChart
               data={counts.map((c) => ({ date: c.date, count: c.count }))}
