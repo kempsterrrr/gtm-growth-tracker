@@ -12,15 +12,16 @@ const { pipelineSteps } = await import("./definition");
 const { validatePipeline } = await import("./runner");
 
 describe("pipelineSteps", () => {
-  it("registers 13 uniquely-named steps (config-sync + 12 collectors)", () => {
-    expect(pipelineSteps).toHaveLength(13);
-    expect(new Set(pipelineSteps.map((s) => s.name)).size).toBe(13);
+  it("registers 14 uniquely-named steps (config-sync + seed-defaults + 12 collectors)", () => {
+    expect(pipelineSteps).toHaveLength(14);
+    expect(new Set(pipelineSteps.map((s) => s.name)).size).toBe(14);
   });
 
   it("registers the expected step names", () => {
     expect(pipelineSteps.map((s) => s.name).sort()).toEqual(
       [
         "config-sync",
+        "seed-defaults",
         "github",
         "npm",
         "pypi",
