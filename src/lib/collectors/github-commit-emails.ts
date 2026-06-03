@@ -1,5 +1,5 @@
 import { getDb } from "../db/client";
-import { githubEngagementEvents, githubUsers, githubUserEmails } from "../db/schema";
+import { githubEngagementEvents, githubUserEmails } from "../db/schema";
 import { extractDomain, isFreemailDomain } from "../utils/domain";
 import { sql } from "drizzle-orm";
 
