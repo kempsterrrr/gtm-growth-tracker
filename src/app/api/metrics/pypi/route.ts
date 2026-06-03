@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { pypiDownloads, trackedPackages } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
 import { daysAgoIso } from "@/lib/dates";
 import type { PypiPackageSummary, PypiDownloadRow } from "@/lib/types/api";
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const packages = db
       .select()
       .from(trackedPackages)
-      .where(eq(trackedPackages.registry, "pypi"))
+      .where(and(eq(trackedPackages.registry, "pypi"), isNull(trackedPackages.competitor)))
       .all();
 
     const summaries: PypiPackageSummary[] = packages.map((pkg) => {
