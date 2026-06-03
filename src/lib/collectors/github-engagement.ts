@@ -97,7 +97,10 @@ export async function collectGithubEngagement() {
         }
         if (stars.length < 100) { setCursor(db, "stargazers", repo.id, "1"); break; }
         setCursor(db, "stargazers", repo.id, String(page + 1));
-      } catch { break; }
+      } catch (err) {
+        console.warn(`[engagement] ${owner}/${name}: stargazers page ${page} failed, stopping:`, err);
+        break;
+      }
     }
     console.log(`[engagement] ${owner}/${name}: ${starCount} stargazers processed`);
 
@@ -114,7 +117,10 @@ export async function collectGithubEngagement() {
           forkCount++;
         }
         if (forks.length < 100) break;
-      } catch { break; }
+      } catch (err) {
+        console.warn(`[engagement] ${owner}/${name}: forks page ${page} failed, stopping:`, err);
+        break;
+      }
     }
     console.log(`[engagement] ${owner}/${name}: ${forkCount} forks processed`);
 
@@ -132,7 +138,10 @@ export async function collectGithubEngagement() {
           issueCount++;
         }
         if (issues.length < 100) break;
-      } catch { break; }
+      } catch (err) {
+        console.warn(`[engagement] ${owner}/${name}: issues page ${page} failed, stopping:`, err);
+        break;
+      }
     }
     setCursor(db, "issues_since", repo.id, new Date().toISOString());
     console.log(`[engagement] ${owner}/${name}: ${issueCount} issues processed`);
@@ -150,7 +159,10 @@ export async function collectGithubEngagement() {
           prCount++;
         }
         if (prs.length < 100) break;
-      } catch { break; }
+      } catch (err) {
+        console.warn(`[engagement] ${owner}/${name}: PRs page ${page} failed, stopping:`, err);
+        break;
+      }
     }
     console.log(`[engagement] ${owner}/${name}: ${prCount} PRs processed`);
 
@@ -169,7 +181,10 @@ export async function collectGithubEngagement() {
           commitCount++;
         }
         if (commits.length < 100) break;
-      } catch { break; }
+      } catch (err) {
+        console.warn(`[engagement] ${owner}/${name}: commits page ${page} failed, stopping:`, err);
+        break;
+      }
     }
     setCursor(db, "commits_since", repo.id, new Date().toISOString());
     console.log(`[engagement] ${owner}/${name}: ${commitCount} commits processed`);

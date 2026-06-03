@@ -1,6 +1,6 @@
 import { getDb } from "../db/client";
 import { githubUsers, githubUserEmails, githubUserOrgs, companies, githubUserCompanies } from "../db/schema";
-import { normalizeCompanyName, domainToCompanyName, extractDomain, isFreemailDomain } from "../utils/domain";
+import { normalizeCompanyName, domainToCompanyName, isFreemailDomain } from "../utils/domain";
 import { sql } from "drizzle-orm";
 
 function getOrCreateCompanyByDomain(db: ReturnType<typeof getDb>, domain: string): number {
@@ -110,7 +110,8 @@ export async function resolveCompanies() {
       try {
         domain = new URL(org.orgWebsite.startsWith("http") ? org.orgWebsite : `https://${org.orgWebsite}`).hostname;
         domain = domain.replace(/^www\./, "");
-      } catch {
+      } catch (err) {
+        console.warn(`[company-resolution] Skipping invalid org website "${org.orgWebsite}":`, err);
         continue;
       }
       if (isFreemailDomain(domain)) continue;

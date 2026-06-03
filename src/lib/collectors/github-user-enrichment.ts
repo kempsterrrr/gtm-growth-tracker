@@ -92,8 +92,9 @@ export async function collectUserEnrichment(batchSize = 50) {
               .run();
           }
         }
-      } catch {
+      } catch (err) {
         // Orgs may fail for some users, continue
+        console.warn(`[enrichment] Could not fetch orgs for ${item.userLogin}:`, err);
       }
 
       // Mark done

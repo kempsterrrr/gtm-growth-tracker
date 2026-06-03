@@ -1,5 +1,5 @@
 import { getDb } from "../db/client";
-import { githubEngagementEvents, githubUsers, githubUserEmails } from "../db/schema";
+import { githubEngagementEvents, githubUserEmails } from "../db/schema";
 import { extractDomain, isFreemailDomain } from "../utils/domain";
 import { sql } from "drizzle-orm";
 
@@ -25,7 +25,8 @@ export async function collectCommitEmails() {
     try {
       const meta = JSON.parse(event.metadata);
       email = meta.email;
-    } catch {
+    } catch (err) {
+      console.warn(`[commit-emails] Skipping unparseable commit metadata for user ${event.userId}:`, err);
       continue;
     }
 
