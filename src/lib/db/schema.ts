@@ -1,4 +1,9 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { sqliteTable, text, integer, real, unique, index, check } from "drizzle-orm/sqlite-core";
+
+// This module is the SINGLE SOURCE OF TRUTH for the database schema — tables,
+// indexes, UNIQUE and CHECK constraints, and DDL defaults. Migrations are
+// generated from it with `npx drizzle-kit generate` (see src/lib/db/migrate.ts).
 
 export const trackedRepos = sqliteTable(
   "tracked_repos",
@@ -9,9 +14,9 @@ export const trackedRepos = sqliteTable(
     displayName: text("display_name"),
     createdAt: text("created_at")
       .notNull()
-      .$defaultFn(() => new Date().toISOString()),
+      .default(sql`(datetime('now'))`),
   },
-  (table) => [uniqueIndex("tracked_repos_owner_name").on(table.owner, table.name)]
+  (table) => [unique("tracked_repos_owner_name").on(table.owner, table.name)]
 );
 
 export const trackedPackages = sqliteTable(
@@ -24,9 +29,12 @@ export const trackedPackages = sqliteTable(
     displayName: text("display_name"),
     createdAt: text("created_at")
       .notNull()
-      .$defaultFn(() => new Date().toISOString()),
+      .default(sql`(datetime('now'))`),
   },
-  (table) => [uniqueIndex("tracked_packages_registry_name").on(table.registry, table.name)]
+  (table) => [
+    unique("tracked_packages_registry_name").on(table.registry, table.name),
+    check("tracked_packages_registry_check", sql`${table.registry} IN ('npm', 'pypi')`),
+  ]
 );
 
 export const githubRepoMetrics = sqliteTable(
@@ -44,9 +52,12 @@ export const githubRepoMetrics = sqliteTable(
     contributors: integer("contributors"),
     collectedAt: text("collected_at")
       .notNull()
-      .$defaultFn(() => new Date().toISOString()),
+      .default(sql`(datetime('now'))`),
   },
-  (table) => [uniqueIndex("github_repo_metrics_repo_date").on(table.repoId, table.date)]
+  (table) => [
+    unique("github_repo_metrics_repo_date").on(table.repoId, table.date),
+    index("idx_github_repo_metrics_date").on(table.repoId, table.date),
+  ]
 );
 
 export const githubTrafficClones = sqliteTable(
@@ -60,7 +71,10 @@ export const githubTrafficClones = sqliteTable(
     clonesTotal: integer("clones_total").notNull(),
     clonesUnique: integer("clones_unique").notNull(),
   },
-  (table) => [uniqueIndex("github_traffic_clones_repo_date").on(table.repoId, table.date)]
+  (table) => [
+    unique("github_traffic_clones_repo_date").on(table.repoId, table.date),
+    index("idx_github_traffic_clones_date").on(table.repoId, table.date),
+  ]
 );
 
 export const githubTrafficViews = sqliteTable(
@@ -74,7 +88,10 @@ export const githubTrafficViews = sqliteTable(
     viewsTotal: integer("views_total").notNull(),
     viewsUnique: integer("views_unique").notNull(),
   },
-  (table) => [uniqueIndex("github_traffic_views_repo_date").on(table.repoId, table.date)]
+  (table) => [
+    unique("github_traffic_views_repo_date").on(table.repoId, table.date),
+    index("idx_github_traffic_views_date").on(table.repoId, table.date),
+  ]
 );
 
 export const npmDownloads = sqliteTable(
@@ -87,7 +104,10 @@ export const npmDownloads = sqliteTable(
     date: text("date").notNull(),
     downloads: integer("downloads").notNull(),
   },
-  (table) => [uniqueIndex("npm_downloads_package_date").on(table.packageId, table.date)]
+  (table) => [
+    unique("npm_downloads_package_date").on(table.packageId, table.date),
+    index("idx_npm_downloads_date").on(table.packageId, table.date),
+  ]
 );
 
 export const pypiDownloads = sqliteTable(
@@ -103,12 +123,13 @@ export const pypiDownloads = sqliteTable(
     categoryValue: text("category_value"),
   },
   (table) => [
-    uniqueIndex("pypi_downloads_package_date_cat").on(
+    unique("pypi_downloads_package_date_cat").on(
       table.packageId,
       table.date,
       table.category,
       table.categoryValue
     ),
+    index("idx_pypi_downloads_date").on(table.packageId, table.date),
   ]
 );
 
@@ -125,7 +146,7 @@ export const reverseDependencies = sqliteTable(
     firstSeen: text("first_seen").notNull(),
   },
   (table) => [
-    uniqueIndex("reverse_deps_package_dependent").on(
+    unique("reverse_deps_package_dependent").on(
       table.packageId,
       table.dependentName,
       table.dependentRegistry
@@ -143,34 +164,48 @@ export const reverseDependencyCounts = sqliteTable(
     date: text("date").notNull(),
     count: integer("count").notNull(),
   },
-  (table) => [uniqueIndex("reverse_dep_counts_package_date").on(table.packageId, table.date)]
+  (table) => [
+    unique("reverse_dep_counts_package_date").on(table.packageId, table.date),
+    index("idx_reverse_dep_counts_date").on(table.packageId, table.date),
+  ]
 );
 
-export const events = sqliteTable("events", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  date: text("date").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  category: text("category", {
-    enum: [
-      "release",
-      "dependency_added",
-      "blog_post",
-      "conference",
-      "upstream_inclusion",
-      "custom",
-    ],
-  }).notNull(),
-  source: text("source", { enum: ["auto", "manual"] })
-    .notNull()
-    .default("manual"),
-  repoId: integer("repo_id").references(() => trackedRepos.id),
-  packageId: integer("package_id").references(() => trackedPackages.id),
-  metadata: text("metadata"),
-  createdAt: text("created_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-});
+export const events = sqliteTable(
+  "events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    date: text("date").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: text("category", {
+      enum: [
+        "release",
+        "dependency_added",
+        "blog_post",
+        "conference",
+        "upstream_inclusion",
+        "custom",
+      ],
+    }).notNull(),
+    source: text("source", { enum: ["auto", "manual"] })
+      .notNull()
+      .default("manual"),
+    repoId: integer("repo_id").references(() => trackedRepos.id),
+    packageId: integer("package_id").references(() => trackedPackages.id),
+    metadata: text("metadata"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    check(
+      "events_category_check",
+      sql`${table.category} IN ('release', 'dependency_added', 'blog_post', 'conference', 'upstream_inclusion', 'custom')`
+    ),
+    check("events_source_check", sql`${table.source} IN ('auto', 'manual')`),
+    index("idx_events_date").on(table.date),
+  ]
+);
 
 // ── Sales Intelligence Tables ──────────────────────────────────────────
 
@@ -189,7 +224,7 @@ export const githubUsers = sqliteTable("github_users", {
   enrichedAt: text("enriched_at"),
   createdAt: text("created_at")
     .notNull()
-    .$defaultFn(() => new Date().toISOString()),
+    .default(sql`(datetime('now'))`),
 });
 
 export const githubUserEmails = sqliteTable(
@@ -205,7 +240,10 @@ export const githubUserEmails = sqliteTable(
       .notNull()
       .default("commit"),
   },
-  (table) => [uniqueIndex("github_user_emails_user_email").on(table.userId, table.email)]
+  (table) => [
+    unique("github_user_emails_user_email").on(table.userId, table.email),
+    check("github_user_emails_source_check", sql`${table.source} IN ('commit', 'profile')`),
+  ]
 );
 
 export const githubUserOrgs = sqliteTable(
@@ -220,7 +258,7 @@ export const githubUserOrgs = sqliteTable(
     orgDescription: text("org_description"),
     orgWebsite: text("org_website"),
   },
-  (table) => [uniqueIndex("github_user_orgs_user_org").on(table.userId, table.orgLogin)]
+  (table) => [unique("github_user_orgs_user_org").on(table.userId, table.orgLogin)]
 );
 
 export const githubEngagementEvents = sqliteTable(
@@ -241,15 +279,21 @@ export const githubEngagementEvents = sqliteTable(
     metadata: text("metadata"),
     collectedAt: text("collected_at")
       .notNull()
-      .$defaultFn(() => new Date().toISOString()),
+      .default(sql`(datetime('now'))`),
   },
   (table) => [
-    uniqueIndex("engagement_events_unique").on(
+    unique("engagement_events_unique").on(
       table.repoId,
       table.userId,
       table.eventType,
       table.githubEventId
     ),
+    check(
+      "github_engagement_events_event_type_check",
+      sql`${table.eventType} IN ('star', 'fork', 'issue', 'pr', 'commit', 'issue_comment', 'pr_review')`
+    ),
+    index("idx_engagement_events_repo_user").on(table.repoId, table.userId),
+    index("idx_engagement_events_user").on(table.userId),
   ]
 );
 
@@ -267,10 +311,10 @@ export const companies = sqliteTable("companies", {
   enrichedAt: text("enriched_at"),
   createdAt: text("created_at")
     .notNull()
-    .$defaultFn(() => new Date().toISOString()),
+    .default(sql`(datetime('now'))`),
   updatedAt: text("updated_at")
     .notNull()
-    .$defaultFn(() => new Date().toISOString()),
+    .default(sql`(datetime('now'))`),
 });
 
 export const githubUserCompanies = sqliteTable(
@@ -288,7 +332,13 @@ export const githubUserCompanies = sqliteTable(
     }).notNull(),
     confidence: real("confidence").notNull().default(0.5),
   },
-  (table) => [uniqueIndex("github_user_companies_unique").on(table.userId, table.companyId)]
+  (table) => [
+    unique("github_user_companies_unique").on(table.userId, table.companyId),
+    check(
+      "github_user_companies_source_check",
+      sql`${table.source} IN ('email_domain', 'profile_company', 'org_membership', 'manual')`
+    ),
+  ]
 );
 
 export const companyScores = sqliteTable(
@@ -308,64 +358,94 @@ export const companyScores = sqliteTable(
     prCount: integer("pr_count").notNull().default(0),
     commitCount: integer("commit_count").notNull().default(0),
   },
-  (table) => [uniqueIndex("company_scores_unique").on(table.companyId, table.repoId, table.date)]
+  (table) => [
+    unique("company_scores_unique").on(table.companyId, table.repoId, table.date),
+    index("idx_company_scores_date").on(table.companyId, table.date),
+  ]
 );
 
-export const alertRules = sqliteTable("alert_rules", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
-  ruleType: text("rule_type", {
-    enum: ["score_threshold", "new_company", "engagement_spike", "new_enterprise_user"],
-  }).notNull(),
-  config: text("config").notNull(),
-  enabled: integer("enabled").notNull().default(1),
-  notifySlack: integer("notify_slack").notNull().default(1),
-  createdAt: text("created_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-});
+export const alertRules = sqliteTable(
+  "alert_rules",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    description: text("description"),
+    ruleType: text("rule_type", {
+      enum: ["score_threshold", "new_company", "engagement_spike", "new_enterprise_user"],
+    }).notNull(),
+    config: text("config").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    notifySlack: integer("notify_slack").notNull().default(1),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    check(
+      "alert_rules_rule_type_check",
+      sql`${table.ruleType} IN ('score_threshold', 'new_company', 'engagement_spike', 'new_enterprise_user')`
+    ),
+  ]
+);
 
-export const alertEvents = sqliteTable("alert_events", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  ruleId: integer("rule_id")
-    .notNull()
-    .references(() => alertRules.id),
-  companyId: integer("company_id").references(() => companies.id),
-  userId: integer("user_id").references(() => githubUsers.id),
-  title: text("title").notNull(),
-  detail: text("detail"),
-  metadata: text("metadata"),
-  slackSent: integer("slack_sent").notNull().default(0),
-  acknowledged: integer("acknowledged").notNull().default(0),
-  firedAt: text("fired_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-});
+export const alertEvents = sqliteTable(
+  "alert_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ruleId: integer("rule_id")
+      .notNull()
+      .references(() => alertRules.id),
+    companyId: integer("company_id").references(() => companies.id),
+    userId: integer("user_id").references(() => githubUsers.id),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    metadata: text("metadata"),
+    slackSent: integer("slack_sent").notNull().default(0),
+    acknowledged: integer("acknowledged").notNull().default(0),
+    firedAt: text("fired_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index("idx_alert_events_fired").on(table.firedAt)]
+);
 
-export const slackConfig = sqliteTable("slack_config", {
-  id: integer("id").primaryKey().default(1),
-  webhookUrl: text("webhook_url"),
-  channelName: text("channel_name"),
-  enabled: integer("enabled").notNull().default(0),
-  updatedAt: text("updated_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-});
+export const slackConfig = sqliteTable(
+  "slack_config",
+  {
+    id: integer("id").primaryKey().default(1),
+    webhookUrl: text("webhook_url"),
+    channelName: text("channel_name"),
+    enabled: integer("enabled").notNull().default(0),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [check("slack_config_id_check", sql`${table.id} = 1`)]
+);
 
-export const enrichmentQueue = sqliteTable("enrichment_queue", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userLogin: text("user_login").notNull().unique(),
-  priority: integer("priority").notNull().default(0),
-  status: text("status", { enum: ["pending", "processing", "done", "failed"] })
-    .notNull()
-    .default("pending"),
-  attempts: integer("attempts").notNull().default(0),
-  lastAttemptAt: text("last_attempt_at"),
-  createdAt: text("created_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-});
+export const enrichmentQueue = sqliteTable(
+  "enrichment_queue",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userLogin: text("user_login").notNull().unique(),
+    priority: integer("priority").notNull().default(0),
+    status: text("status", { enum: ["pending", "processing", "done", "failed"] })
+      .notNull()
+      .default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastAttemptAt: text("last_attempt_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    check(
+      "enrichment_queue_status_check",
+      sql`${table.status} IN ('pending', 'processing', 'done', 'failed')`
+    ),
+    index("idx_enrichment_queue_status").on(table.status, table.priority),
+  ]
+);
 
 export const collectionCursors = sqliteTable(
   "collection_cursors",
@@ -378,17 +458,23 @@ export const collectionCursors = sqliteTable(
     cursorValue: text("cursor_value").notNull(),
     updatedAt: text("updated_at")
       .notNull()
-      .$defaultFn(() => new Date().toISOString()),
+      .default(sql`(datetime('now'))`),
   },
-  (table) => [uniqueIndex("collection_cursors_unique").on(table.cursorType, table.repoId)]
+  (table) => [unique("collection_cursors_unique").on(table.cursorType, table.repoId)]
 );
 
-export const pipelineRuns = sqliteTable("pipeline_runs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  status: text("status", { enum: ["running", "success", "failed"] }).notNull(),
-  startedAt: text("started_at").notNull(),
-  finishedAt: text("finished_at"),
-});
+export const pipelineRuns = sqliteTable(
+  "pipeline_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    status: text("status", { enum: ["running", "success", "failed"] }).notNull(),
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at"),
+  },
+  (table) => [
+    check("pipeline_runs_status_check", sql`${table.status} IN ('running', 'success', 'failed')`),
+  ]
+);
 
 export const pipelineRunSteps = sqliteTable(
   "pipeline_run_steps",
@@ -403,5 +489,12 @@ export const pipelineRunSteps = sqliteTable(
     startedAt: text("started_at").notNull(),
     finishedAt: text("finished_at").notNull(),
   },
-  (table) => [uniqueIndex("pipeline_run_steps_run_step").on(table.runId, table.stepName)]
+  (table) => [
+    unique("pipeline_run_steps_run_step").on(table.runId, table.stepName),
+    check(
+      "pipeline_run_steps_status_check",
+      sql`${table.status} IN ('success', 'failed', 'skipped')`
+    ),
+    index("idx_pipeline_run_steps_run").on(table.runId),
+  ]
 );
