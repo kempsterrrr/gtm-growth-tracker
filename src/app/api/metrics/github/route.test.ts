@@ -4,7 +4,11 @@ import { tmpdir } from "os";
 import path from "path";
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
-import type { GithubRepoSummary, GithubRepoMetricsResponse } from "@/lib/types/api";
+import type {
+  GithubRepoSummary,
+  GithubRepoMetricsResponse,
+  CompetitorEntitySummary,
+} from "@/lib/types/api";
 
 process.env.DATABASE_PATH = path.join(
   mkdtempSync(path.join(tmpdir(), "gtm-route-test-")),
@@ -54,5 +58,13 @@ describe("GET /api/metrics/github (seeded temp DB)", () => {
     const body = (await res.json()) as GithubRepoMetricsResponse;
     expect(body.metrics).toHaveLength(1);
     expect(body.metrics![0].stars).toBe(5000);
+  });
+
+  it("lists competitor repos (owner/name + competitor) under ?competitors=1", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/metrics/github?competitors=1"));
+    const body = (await res.json()) as CompetitorEntitySummary[];
+    expect(body).toEqual([
+      { id: theirId, name: "them/their-repo", displayName: "Theirs", competitor: "Acme" },
+    ]);
   });
 });

@@ -100,6 +100,19 @@ export interface DependencyDetailResponse {
   dependents: DependentRow[];
 }
 
+// ── ?competitors=1 view (github/npm/pypi list endpoints) ────────────────
+/** Competitor-attributed entities for the compare overlay. The default list
+ *  paths exclude these (the totals guard); this opt-in view exposes them with
+ *  their competitor name for labeling. Series come from the existing
+ *  per-id detail paths, which intentionally serve competitor entities. */
+export interface CompetitorEntitySummary {
+  id: number;
+  /** Repo as "owner/name"; package as registry name. */
+  name: string;
+  displayName: string | null;
+  competitor: string;
+}
+
 // ── /api/alerts/rules ───────────────────────────────────────────────────
 export interface AlertRuleRow {
   id: number;

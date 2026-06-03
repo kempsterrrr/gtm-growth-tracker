@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import path from "path";
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
-import type { NpmPackageSummary, DownloadRow } from "@/lib/types/api";
+import type { NpmPackageSummary, DownloadRow, CompetitorEntitySummary } from "@/lib/types/api";
 
 process.env.DATABASE_PATH = path.join(
   mkdtempSync(path.join(tmpdir(), "gtm-route-test-")),
@@ -82,5 +82,13 @@ describe("GET /api/metrics/npm (seeded temp DB)", () => {
     );
     const detail = (await detailRes.json()) as DownloadRow[];
     expect(detail.length).toBe(6);
+  });
+
+  it("lists competitor packages (with competitor name) under ?competitors=1", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/metrics/npm?competitors=1"));
+    const body = (await res.json()) as CompetitorEntitySummary[];
+    expect(body).toEqual([
+      { id: rivalId, name: "rival-pkg", displayName: "Rival", competitor: "Acme" },
+    ]);
   });
 });

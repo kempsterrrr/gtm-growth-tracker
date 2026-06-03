@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { pypiDownloads, trackedPackages } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, sql, isNull, isNotNull } from "drizzle-orm";
 import { daysAgoIso } from "@/lib/dates";
-import type { PypiPackageSummary, PypiDownloadRow } from "@/lib/types/api";
+import type {
+  PypiPackageSummary,
+  PypiDownloadRow,
+  CompetitorEntitySummary,
+} from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -12,6 +16,22 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate");
 
   const db = getDb();
+
+  // Opt-in compare view: competitor-attributed packages with their label.
+  if (!packageId && searchParams.get("competitors") === "1") {
+    const rows = db
+      .select()
+      .from(trackedPackages)
+      .where(and(eq(trackedPackages.registry, "pypi"), isNotNull(trackedPackages.competitor)))
+      .all();
+    const payload: CompetitorEntitySummary[] = rows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      displayName: p.displayName,
+      competitor: p.competitor!,
+    }));
+    return NextResponse.json(payload);
+  }
 
   if (!packageId) {
     const packages = db

@@ -4,7 +4,11 @@ import { tmpdir } from "os";
 import path from "path";
 import Database from "better-sqlite3";
 import { NextRequest } from "next/server";
-import type { PypiPackageSummary, PypiDownloadRow } from "@/lib/types/api";
+import type {
+  PypiPackageSummary,
+  PypiDownloadRow,
+  CompetitorEntitySummary,
+} from "@/lib/types/api";
 
 process.env.DATABASE_PATH = path.join(
   mkdtempSync(path.join(tmpdir(), "gtm-route-test-")),
@@ -59,5 +63,13 @@ describe("GET /api/metrics/pypi (seeded temp DB)", () => {
     const body = (await res.json()) as PypiDownloadRow[];
     expect(body).toHaveLength(3);
     expect(body[0].downloads).toBe(999);
+  });
+
+  it("lists competitor packages (with competitor name) under ?competitors=1", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/metrics/pypi?competitors=1"));
+    const body = (await res.json()) as CompetitorEntitySummary[];
+    expect(body).toEqual([
+      { id: rivalId, name: "rival-pkg", displayName: "Rival", competitor: "Acme" },
+    ]);
   });
 });
