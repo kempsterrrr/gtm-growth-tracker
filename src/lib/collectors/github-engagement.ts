@@ -13,7 +13,10 @@ const MAX_PAGES_PER_ENDPOINT = 5;
 // are a weight-0 employee signal (#23), not prospect signal.
 const BACKFILL_MAX_PAGES = 60;
 const BACKFILL_PR_MAX_PAGES = 20;
-const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
+// Full-history floor for the /issues `since` param. NOT the unix epoch:
+// GitHub silently returns an empty result set for since=1970-01-01 (verified
+// live) — use GitHub's founding year, which nothing on the platform predates.
+const BACKFILL_SINCE_ISO = "2008-01-01T00:00:00Z";
 
 function ensureUser(db: ReturnType<typeof getDb>, login: string, githubId?: number, avatarUrl?: string): number {
   db.insert(githubUsers)
@@ -133,7 +136,7 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
     // Issues (since last collection; full history on a competitor's first run)
     const issueSince =
       getCursor(db, "issues_since", repo.id) ||
-      (backfill ? EPOCH_ISO : new Date(Date.now() - 90 * 86400000).toISOString());
+      (backfill ? BACKFILL_SINCE_ISO : new Date(Date.now() - 90 * 86400000).toISOString());
     let issueCount = 0;
     try {
       // listMaxPages here matters more than for stars: /issues mixes PRs in,
