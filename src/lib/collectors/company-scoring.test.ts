@@ -66,6 +66,22 @@ event(ownRepoId, u2, "issue", "issue-1");
 event(rivalRepoId, u1, "issue", "issue-9");
 event(rivalRepoId, u2, "commit", "sha2");
 
+// Depends-on signals: 2 dependents on one competitor package → 2 × 12 = 24
+// added to the competitor aggregate.
+run("INSERT INTO tracked_packages (registry, name, competitor) VALUES ('npm', 'pinata-js', 'Acme')");
+const rivalPkgId = (
+  sqlite.prepare("SELECT id FROM tracked_packages WHERE name='pinata-js'").get() as { id: number }
+).id;
+const signal = (dependent: string) =>
+  run(
+    "INSERT INTO company_competitor_signals (company_id, package_id, signal_type, dependent_name, first_seen) VALUES (?, ?, 'depends_on', ?, '2026-06-01')",
+    companyId,
+    rivalPkgId,
+    dependent
+  );
+signal("acme-app");
+signal("acme-cli");
+
 describe("scoreCompanies with competitor attribution", () => {
   it("applies the weight table per repo and writes scoped per-repo + aggregate rows", async () => {
     await scoreCompanies();
@@ -100,7 +116,7 @@ describe("scoreCompanies with competitor attribution", () => {
       )
       .all(companyId, today) as Array<{ scope: string; score: number }>;
     expect(aggregates).toEqual([
-      { scope: "competitor", score: 10 },
+      { scope: "competitor", score: 34 }, // 10 engagement + 2 dependents × 12
       { scope: "own", score: 18 },
     ]);
   });
