@@ -136,7 +136,10 @@ export async function collectGithubEngagement(client: GithubClient = createGithu
       (backfill ? EPOCH_ISO : new Date(Date.now() - 90 * 86400000).toISOString());
     let issueCount = 0;
     try {
-      for await (const page of client.issuePages(owner, name, issueSince, { maxPages: MAX_PAGES_PER_ENDPOINT })) {
+      // listMaxPages here matters more than for stars: /issues mixes PRs in,
+      // so on PR-heavy repos a shallow cap is consumed by PR rows before any
+      // true issue (the highest-weight prospect signal) is reached.
+      for await (const page of client.issuePages(owner, name, issueSince, { maxPages: listMaxPages })) {
         for (const i of page.items) {
           const userId = ensureUser(db, i.user.login, i.user.id, i.user.avatar_url);
           recordEvent(db, repo.id, userId, "issue", i.created_at?.split("T")[0] || null, `issue-${i.number}`, JSON.stringify({ title: i.title }));

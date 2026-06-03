@@ -30,10 +30,16 @@ const rivalId = (
 // collector asks the client for on first vs subsequent collections.
 const calls: Record<
   string,
-  { stars: PageOptions[]; forks: PageOptions[]; issuesSince: string[]; prs: PageOptions[] }
+  {
+    stars: PageOptions[];
+    forks: PageOptions[];
+    issuesSince: string[];
+    issuesOpts: PageOptions[];
+    prs: PageOptions[];
+  }
 > = {
-  "own-repo": { stars: [], forks: [], issuesSince: [], prs: [] },
-  "rival-repo": { stars: [], forks: [], issuesSince: [], prs: [] },
+  "own-repo": { stars: [], forks: [], issuesSince: [], issuesOpts: [], prs: [] },
+  "rival-repo": { stars: [], forks: [], issuesSince: [], issuesOpts: [], prs: [] },
 };
 
 async function* onePage<T>(items: T[]): AsyncGenerator<Page<T>> {
@@ -89,6 +95,7 @@ const fakeClient: GithubClient = {
   },
   issuePages: (owner, repo, since, opts) => {
     calls[repo].issuesSince.push(since);
+    calls[repo].issuesOpts.push(opts!);
     return repo === "rival-repo"
       ? onePage([
           {
@@ -111,15 +118,19 @@ describe("competitor backfill on first collection", () => {
   it("first run: full history for the competitor repo, normal windows for our own", async () => {
     await collectGithubEngagement(fakeClient);
 
-    // Competitor repo: backfill mode
+    // Competitor repo: backfill mode. Issues need the deep page cap too: the
+    // GitHub /issues endpoint mixes PRs in, so on PR-heavy repos a shallow
+    // cap gets consumed by PR rows before reaching a single true issue.
     expect(calls["rival-repo"].stars[0].maxPages).toBe(60);
     expect(calls["rival-repo"].forks[0].maxPages).toBe(60);
     expect(calls["rival-repo"].issuesSince[0]).toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["rival-repo"].issuesOpts[0].maxPages).toBe(60);
     expect(calls["rival-repo"].prs[0].maxPages).toBe(20);
 
     // Own repo: existing behavior (5-page cap, ~90-day issue window)
     expect(calls["own-repo"].stars[0].maxPages).toBe(5);
     expect(calls["own-repo"].issuesSince[0]).not.toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["own-repo"].issuesOpts[0].maxPages).toBe(5);
     expect(calls["own-repo"].prs[0].maxPages).toBe(3);
 
     // Backfill flagged done
@@ -158,6 +169,7 @@ describe("competitor backfill on first collection", () => {
     expect(calls["rival-repo"].stars[1].maxPages).toBe(5);
     expect(calls["rival-repo"].forks[1].maxPages).toBe(5);
     expect(calls["rival-repo"].issuesSince[1]).not.toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["rival-repo"].issuesOpts[1].maxPages).toBe(5);
     expect(calls["rival-repo"].prs[1].maxPages).toBe(3);
   });
 });
