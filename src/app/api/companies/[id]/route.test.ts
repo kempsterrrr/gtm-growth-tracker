@@ -94,6 +94,28 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
     expect(res.status).toBe(404);
   });
 
+  it("carries the competitor-employee tag on listed users", async () => {
+    sqlite
+      .prepare(
+        "INSERT INTO github_users (login, competitor_employee, competitor_employee_source) VALUES ('insider', 'Pinata', 'commit_activity')"
+      )
+      .run();
+    const insider = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='insider'").get() as { id: number }
+    ).id;
+    sqlite
+      .prepare(
+        "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')"
+      )
+      .run(insider, companyId);
+
+    const res = await request(companyId);
+    const body = (await res.json()) as CompanyDetail;
+    const user = body.users.find((u) => u.login === "insider");
+    expect(user?.competitorEmployee).toBe("Pinata");
+    expect(user?.competitorEmployeeSource).toBe("commit_activity");
+  });
+
   it("attributes the competitor score to its sources (repos + package dependents, score desc)", async () => {
     const res = await request(companyId);
     const body = (await res.json()) as CompanyDetail;

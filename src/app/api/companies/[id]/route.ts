@@ -135,6 +135,8 @@ export async function GET(
       name: githubUsers.name,
       avatarUrl: githubUsers.avatarUrl,
       companyRaw: githubUsers.companyRaw,
+      competitorEmployee: githubUsers.competitorEmployee,
+      competitorEmployeeSource: githubUsers.competitorEmployeeSource,
     })
     .from(githubUserCompanies)
     .innerJoin(githubUsers, sql`${githubUserCompanies.userId} = ${githubUsers.id}`)
@@ -163,6 +165,8 @@ export async function GET(
       confidence: u.confidence,
       engagementTypes: events.map((e) => e.eventType),
       eventCount: events.reduce((s, e) => s + e.count, 0),
+      competitorEmployee: u.competitorEmployee,
+      competitorEmployeeSource: u.competitorEmployeeSource,
     };
   });
 

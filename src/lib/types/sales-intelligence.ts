@@ -83,6 +83,10 @@ export interface CompanyUser {
   confidence: number;
   engagementTypes: EngagementEventType[];
   eventCount: number;
+  /** Likely competitor employee (the competitor's name) — badged in the UI,
+   *  excluded from competitor aggregates, never deleted. */
+  competitorEmployee: string | null;
+  competitorEmployeeSource: string | null;
 }
 
 export interface AlertRuleConfig {
