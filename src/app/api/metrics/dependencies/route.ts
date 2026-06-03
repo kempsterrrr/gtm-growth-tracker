@@ -6,7 +6,7 @@ import {
   reverseDependencyCounts,
   trackedPackages,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
 
   if (!packageId) {
     // Return all packages with their latest dep counts
-    const packages = db.select().from(trackedPackages).all();
+    const packages = db
+      .select()
+      .from(trackedPackages)
+      .where(isNull(trackedPackages.competitor))
+      .all();
 
     const summaries: DependencySummary[] = packages.map((pkg) => {
       const latest = db
