@@ -37,6 +37,12 @@ export const COMPETITOR_ENGAGEMENT_WEIGHTS: Record<EngagementEventType, number> 
   commit: 0,
 };
 
+/** "Ships code on the competitor" — the strongest prospect signal (PRD:
+ *  dependents rank alongside, and above, issue-filers). Applied per
+ *  dependent (capped per package at MAX_EVENTS_PER_TYPE) to the competitor
+ *  aggregate. */
+export const DEPENDS_ON_WEIGHT = 12;
+
 /** Enrichment queue: own-repo users always rank above competitor-repo users.
  *  Applied as an offset so the per-event-type ordering is preserved within
  *  the competitor band, and the queue's MAX() upsert lifts anyone who also
