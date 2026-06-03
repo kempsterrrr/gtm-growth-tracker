@@ -110,7 +110,8 @@ export async function resolveCompanies() {
       try {
         domain = new URL(org.orgWebsite.startsWith("http") ? org.orgWebsite : `https://${org.orgWebsite}`).hostname;
         domain = domain.replace(/^www\./, "");
-      } catch {
+      } catch (err) {
+        console.warn(`[company-resolution] Skipping invalid org website "${org.orgWebsite}":`, err);
         continue;
       }
       if (isFreemailDomain(domain)) continue;

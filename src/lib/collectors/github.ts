@@ -26,8 +26,8 @@ export async function collectGithubMetrics() {
       try {
         const contributors = await getContributorStats(repo.owner, repo.name);
         contributorCount = contributors.length;
-      } catch {
-        console.warn(`[github] Could not fetch contributors for ${repo.owner}/${repo.name}`);
+      } catch (err) {
+        console.warn(`[github] Could not fetch contributors for ${repo.owner}/${repo.name}:`, err);
       }
 
       // Upsert repo metrics
@@ -80,8 +80,8 @@ export async function collectGithubMetrics() {
             .run();
         }
         console.log(`[github] ${repo.owner}/${repo.name}: archived ${clones.clones.length} days of clone data`);
-      } catch {
-        console.warn(`[github] Could not fetch traffic/clones for ${repo.owner}/${repo.name} (requires push access)`);
+      } catch (err) {
+        console.warn(`[github] Could not fetch traffic/clones for ${repo.owner}/${repo.name} (requires push access):`, err);
       }
 
       try {
@@ -105,8 +105,8 @@ export async function collectGithubMetrics() {
             .run();
         }
         console.log(`[github] ${repo.owner}/${repo.name}: archived ${views.views.length} days of view data`);
-      } catch {
-        console.warn(`[github] Could not fetch traffic/views for ${repo.owner}/${repo.name} (requires push access)`);
+      } catch (err) {
+        console.warn(`[github] Could not fetch traffic/views for ${repo.owner}/${repo.name} (requires push access):`, err);
       }
     } catch (err) {
       console.error(`[github] Error collecting ${repo.owner}/${repo.name}:`, err);

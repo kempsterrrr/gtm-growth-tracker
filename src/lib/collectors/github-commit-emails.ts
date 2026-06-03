@@ -25,7 +25,8 @@ export async function collectCommitEmails() {
     try {
       const meta = JSON.parse(event.metadata);
       email = meta.email;
-    } catch {
+    } catch (err) {
+      console.warn(`[commit-emails] Skipping unparseable commit metadata for user ${event.userId}:`, err);
       continue;
     }
 
