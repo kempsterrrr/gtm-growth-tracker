@@ -1,25 +1,22 @@
 import { runMigrations } from "../lib/db/migrate";
 import { backfillNpmDownloads } from "../lib/collectors/npm";
-import { syncConfig } from "./sync-config";
-import fs from "fs";
-import { parse } from "yaml";
-import path from "path";
-import type { GtmConfig } from "../lib/types/config";
+import { readConfig, syncToDatabase, ConfigError } from "../lib/config/gtm-config";
 
 async function main() {
   console.log("Setting up database...");
   runMigrations();
-  syncConfig();
+  syncToDatabase();
 
   // Read config for backfill date
-  const configPath = path.join(process.cwd(), "gtm-config.yaml");
   let fromDate = "2024-01-01"; // Default
-
-  if (fs.existsSync(configPath)) {
-    const config: GtmConfig = parse(fs.readFileSync(configPath, "utf-8"));
+  try {
+    const config = readConfig();
     if (config.collection?.npm_backfill_from) {
       fromDate = config.collection.npm_backfill_from;
     }
+  } catch (err) {
+    if (!(err instanceof ConfigError && err.message.includes("not found"))) throw err;
+    // Missing config file: fall back to the default date
   }
 
   console.log(`Backfilling npm downloads from ${fromDate}...`);
