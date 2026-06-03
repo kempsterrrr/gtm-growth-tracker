@@ -46,6 +46,10 @@ const trackedPackageConfigSchema = z.object({
   competitor: z.string().min(1).optional(),
 });
 
+const competitorDomainsSchema = z.object({
+  domains: z.array(z.string().min(1)).default([]),
+});
+
 export const gtmConfigSchema = z.object({
   github: z
     .object({ repos: z.array(trackedRepoConfigSchema).default([]) })
@@ -56,6 +60,7 @@ export const gtmConfigSchema = z.object({
       pypi: z.array(trackedPackageConfigSchema).default([]),
     })
     .default({ npm: [], pypi: [] }),
+  competitors: z.record(z.string().min(1), competitorDomainsSchema).optional(),
   collection: z.object({ npm_backfill_from: z.string().optional() }).optional(),
 });
 
@@ -95,6 +100,28 @@ export function readConfig(configPath = defaultConfigPath()): GtmConfig {
       if (invalid) {
         throw new ConfigError(
           `Invalid config in ${path.basename(configPath)}: packages.${registry} "${pkg.name}": ${invalid}`
+        );
+      }
+    }
+  }
+  // Referential integrity: every competitors-block entry must be used by at
+  // least one repo or package entry, so typos surface immediately instead of
+  // silently disabling employee tagging. Entries without a block are fine —
+  // tagging falls back to the org/commit signals.
+  if (config.competitors) {
+    const used = new Set<string>();
+    for (const repo of config.github.repos) {
+      if (repo.competitor) used.add(repo.competitor);
+    }
+    for (const registry of ["npm", "pypi"] as const) {
+      for (const pkg of config.packages[registry]) {
+        if (pkg.competitor) used.add(pkg.competitor);
+      }
+    }
+    for (const name of Object.keys(config.competitors)) {
+      if (!used.has(name)) {
+        throw new ConfigError(
+          `Invalid config in ${path.basename(configPath)}: competitors block declares "${name}" but no repo or package entry uses it`
         );
       }
     }

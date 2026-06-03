@@ -178,3 +178,65 @@ describe("competitor attribution (entry-level)", () => {
     expect(after.competitor).toBeNull();
   });
 });
+
+describe("competitors block", () => {
+  it("parses a block whose names are used by a repo or a package, defaulting domains", () => {
+    const p = path.join(tmp, "block-used.yaml");
+    writeFileSync(
+      p,
+      `github:
+  repos:
+    - owner: them
+      name: their-repo
+      competitor: Acme
+packages:
+  npm: []
+  pypi:
+    - name: rival-sdk
+      competitor: Rival
+competitors:
+  Acme:
+    domains:
+      - acme.dev
+      - acme.io
+  Rival: {}
+`
+    );
+    const config = readConfig(p);
+    expect(config.competitors?.Acme?.domains).toEqual(["acme.dev", "acme.io"]);
+    expect(config.competitors?.Rival?.domains).toEqual([]);
+  });
+
+  it("rejects a block entry referencing a name no entry uses, naming it", () => {
+    const p = path.join(tmp, "block-orphan.yaml");
+    writeFileSync(
+      p,
+      `github:
+  repos:
+    - owner: us
+      name: our-repo
+competitors:
+  Ghost:
+    domains:
+      - ghost.io
+`
+    );
+    expect(() => readConfig(p)).toThrow(ConfigError);
+    expect(() => readConfig(p)).toThrow(/Ghost/);
+  });
+
+  it("accepts competitor entries with no competitors block", () => {
+    const p = path.join(tmp, "no-block.yaml");
+    writeFileSync(
+      p,
+      `github:
+  repos:
+    - owner: them
+      name: their-repo
+      competitor: Acme
+`
+    );
+    expect(() => readConfig(p)).not.toThrow();
+    expect(readConfig(p).competitors).toBeUndefined();
+  });
+});
