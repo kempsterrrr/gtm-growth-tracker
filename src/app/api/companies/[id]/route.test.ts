@@ -34,6 +34,25 @@ aggregate("own", daysAgoIso(3), 12);
 aggregate("own", todayIso(), 20);
 aggregate("competitor", todayIso(), 15);
 
+// Per-repo competitor attribution rows: two dates for the same repo — the
+// route must return only the latest.
+sqlite
+  .prepare(
+    "INSERT INTO tracked_repos (owner, name, display_name, competitor) VALUES ('pinata', 'pinata-sdk', 'Pinata SDK', 'Pinata')"
+  )
+  .run();
+const rivalRepoId = (
+  sqlite.prepare("SELECT id FROM tracked_repos WHERE name='pinata-sdk'").get() as { id: number }
+).id;
+const repoScore = (date: string, score: number, issues: number, forks: number) =>
+  sqlite
+    .prepare(
+      "INSERT INTO company_scores (company_id, repo_id, scope, date, score, user_count, star_count, fork_count, issue_count, pr_count, commit_count) VALUES (?, ?, 'competitor', ?, ?, 1, 0, ?, ?, 0, 0)"
+    )
+    .run(companyId, rivalRepoId, date, score, forks, issues);
+repoScore(daysAgoIso(3), 8, 2, 1);
+repoScore(todayIso(), 14, 4, 2);
+
 const request = (id: number) =>
   GET(new NextRequest(`http://localhost/api/companies/${id}`), {
     params: Promise.resolve({ id: String(id) }),
@@ -58,5 +77,24 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
   it("404s for an unknown company", async () => {
     const res = await request(99999);
     expect(res.status).toBe(404);
+  });
+
+  it("attributes the competitor score to its source repos (latest row per repo)", async () => {
+    const res = await request(companyId);
+    const body = (await res.json()) as CompanyDetail;
+    expect(body.competitorAttribution).toEqual([
+      {
+        competitor: "Pinata",
+        entity: "pinata/pinata-sdk",
+        displayName: "Pinata SDK",
+        score: 14,
+        userCount: 1,
+        starCount: 0,
+        forkCount: 2,
+        issueCount: 4,
+        prCount: 0,
+        commitCount: 0,
+      },
+    ]);
   });
 });

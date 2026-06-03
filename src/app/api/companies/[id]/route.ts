@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import type { CompanyDetail } from "@/lib/types/api";
 import {
-  companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents,
+  companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents, trackedRepos,
 } from "@/lib/db/schema";
 import { sql, desc } from "drizzle-orm";
 import { deriveSegment } from "@/lib/segments";
@@ -43,6 +43,49 @@ export async function GET(
     )
     .orderBy(companyScores.date)
     .all();
+
+  // Which competitor repos drove the competitor score — latest per-repo row.
+  // Rows whose repo has since lost its competitor attribution are skipped.
+  const attributionRows = db
+    .select({
+      owner: trackedRepos.owner,
+      name: trackedRepos.name,
+      displayName: trackedRepos.displayName,
+      competitor: trackedRepos.competitor,
+      score: companyScores.score,
+      userCount: companyScores.userCount,
+      starCount: companyScores.starCount,
+      forkCount: companyScores.forkCount,
+      issueCount: companyScores.issueCount,
+      prCount: companyScores.prCount,
+      commitCount: companyScores.commitCount,
+    })
+    .from(companyScores)
+    .innerJoin(trackedRepos, sql`${companyScores.repoId} = ${trackedRepos.id}`)
+    .where(
+      sql`${companyScores.companyId} = ${companyId} AND ${companyScores.scope} = 'competitor' AND ${companyScores.date} = (
+        SELECT MAX(date) FROM company_scores cs2
+        WHERE cs2.company_id = ${companyScores.companyId}
+          AND cs2.repo_id = ${companyScores.repoId}
+          AND cs2.scope = 'competitor'
+      )`
+    )
+    .orderBy(desc(companyScores.score))
+    .all();
+  const competitorAttribution = attributionRows
+    .filter((r) => r.competitor != null)
+    .map((r) => ({
+      competitor: r.competitor!,
+      entity: `${r.owner}/${r.name}`,
+      displayName: r.displayName,
+      score: r.score,
+      userCount: r.userCount,
+      starCount: r.starCount,
+      forkCount: r.forkCount,
+      issueCount: r.issueCount,
+      prCount: r.prCount,
+      commitCount: r.commitCount,
+    }));
 
   // Users linked to this company
   const userLinks = db
@@ -100,6 +143,7 @@ export async function GET(
     commitCount: latestScore?.commitCount || 0,
     scoreHistory,
     users,
+    competitorAttribution,
   };
   return NextResponse.json(payload);
 }

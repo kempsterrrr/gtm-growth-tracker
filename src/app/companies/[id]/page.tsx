@@ -9,7 +9,19 @@ import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
 import { EngagementBadges } from "@/components/companies/EngagementBadges";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Globe, MapPin } from "lucide-react";
-import type { CompanyDetail, CompanyUser, EngagementEventType } from "@/lib/types/sales-intelligence";
+import { formatEngagementBreakdown } from "../transforms";
+import type {
+  CompanyDetail,
+  CompanyUser,
+  EngagementEventType,
+  CompanySegment,
+} from "@/lib/types/sales-intelligence";
+
+const SEGMENT_BADGE: Record<CompanySegment, "default" | "secondary" | "outline"> = {
+  prospect: "default",
+  battleground: "secondary",
+  engaged: "outline",
+};
 
 export default function CompanyDetailPage() {
   const { id } = useParams();
@@ -61,13 +73,17 @@ export default function CompanyDetailPage() {
               {company.industry}
             </Badge>
           )}
+          <Badge variant={SEGMENT_BADGE[company.segment]} className="text-xs">
+            {company.segment === "prospect" ? "net-new prospect" : company.segment}
+          </Badge>
         </div>
       </header>
 
       <div className="flex-1 p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <MetricCard title="Score" value={company.score.toFixed(0)} />
+          <MetricCard title="Competitor Score" value={company.competitorScore.toFixed(0)} />
           <MetricCard title="Users" value={company.userCount} />
           <MetricCard title="Stars" value={company.starCount} />
           <MetricCard title="PRs" value={company.prCount} />
@@ -92,6 +108,37 @@ export default function CompanyDetailPage() {
             <span>Commits: {company.commitCount}</span>
           </div>
         </div>
+
+        {/* Competitor attribution — which competitor products this company uses */}
+        {company.competitorAttribution && company.competitorAttribution.length > 0 && (
+          <div className="border rounded-lg">
+            <div className="px-4 py-3 border-b">
+              <h3 className="text-sm font-medium">Competitor Engagement</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                What drove the competitor score of {company.competitorScore.toFixed(0)}
+              </p>
+            </div>
+            <div className="divide-y">
+              {company.competitorAttribution.map((row) => (
+                <div key={row.entity} className="px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-sm">
+                      engages with <span className="font-medium">{row.competitor}</span>:{" "}
+                      {formatEngagementBreakdown(row)} on{" "}
+                      <span className="font-medium">{row.displayName || row.entity}</span>
+                    </span>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {row.entity} · {row.userCount} {row.userCount === 1 ? "user" : "users"}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {row.score.toFixed(0)} pts
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Score trend chart */}
         {company.scoreHistory && company.scoreHistory.length > 1 && (

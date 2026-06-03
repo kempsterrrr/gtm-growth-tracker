@@ -15,6 +15,7 @@ export type {
   CompanySummary,
   CompanyDetail,
   CompanySegment,
+  CompetitorAttributionRow,
   FiredAlert,
   AlertRuleType,
 } from "./sales-intelligence";
