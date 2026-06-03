@@ -409,7 +409,15 @@ export const alertRules = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     ruleType: text("rule_type", {
-      enum: ["score_threshold", "new_company", "engagement_spike", "new_enterprise_user"],
+      enum: [
+        "score_threshold",
+        "new_company",
+        "engagement_spike",
+        "new_enterprise_user",
+        "new_prospect",
+        "battleground_shift",
+        "competitor_employee_engagement",
+      ],
     }).notNull(),
     config: text("config").notNull(),
     enabled: integer("enabled").notNull().default(1),
@@ -421,7 +429,7 @@ export const alertRules = sqliteTable(
   (table) => [
     check(
       "alert_rules_rule_type_check",
-      sql`${table.ruleType} IN ('score_threshold', 'new_company', 'engagement_spike', 'new_enterprise_user')`
+      sql`${table.ruleType} IN ('score_threshold', 'new_company', 'engagement_spike', 'new_enterprise_user', 'new_prospect', 'battleground_shift', 'competitor_employee_engagement')`
     ),
   ]
 );

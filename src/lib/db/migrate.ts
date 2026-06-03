@@ -32,8 +32,13 @@ export function runMigrations() {
 
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
+  // Table-recreate migrations (CHECK changes) drop-and-rename referenced
+  // tables. The in-file `PRAGMA foreign_keys=OFF` drizzle emits is a no-op
+  // inside the migrator's transaction, so enforcement must be toggled at the
+  // connection level around the run. App connections (getDb) re-enable it.
+  sqlite.pragma("foreign_keys = OFF");
   migrate(drizzle(sqlite), { migrationsFolder: path.join(process.cwd(), "drizzle") });
+  sqlite.pragma("foreign_keys = ON");
   sqlite.close();
   console.log("Migrations complete.");
 }

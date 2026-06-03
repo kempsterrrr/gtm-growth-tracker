@@ -17,7 +17,10 @@ export type AlertRuleType =
   | "score_threshold"
   | "new_company"
   | "engagement_spike"
-  | "new_enterprise_user";
+  | "new_enterprise_user"
+  | "new_prospect"
+  | "battleground_shift"
+  | "competitor_employee_engagement";
 
 export type CompanySegment = "engaged" | "battleground" | "prospect";
 
