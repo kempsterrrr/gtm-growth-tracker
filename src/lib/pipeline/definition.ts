@@ -1,4 +1,4 @@
-import { syncConfig } from "../../scripts/sync-config";
+import { syncToDatabase } from "../config/gtm-config";
 import { seedDefaults } from "../db/seed-defaults";
 import { collectGithubMetrics } from "../collectors/github";
 import { collectNpmDownloads } from "../collectors/npm";
@@ -23,7 +23,7 @@ import type { PipelineStep } from "./runner";
  * of each other; the sales-intelligence chain is linear.
  */
 export const pipelineSteps: PipelineStep[] = [
-  { name: "config-sync", dependsOn: [], run: async () => syncConfig() },
+  { name: "config-sync", dependsOn: [], run: async () => syncToDatabase() },
   // Data seeding (formerly migration DDL) — default alert rules
   { name: "seed-defaults", dependsOn: ["config-sync"], run: async () => seedDefaults() },
 

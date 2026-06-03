@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Play, Loader2, MessageSquare } from "lucide-react";
+import { validatePackageName } from "@/lib/validation/package-name";
 
 interface TrackedRepo {
   id: number;
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   const [pkgRegistry, setPkgRegistry] = useState("npm");
   const [pkgName, setPkgName] = useState("");
   const [pkgDisplayName, setPkgDisplayName] = useState("");
+  const [pkgError, setPkgError] = useState<string | null>(null);
 
   async function fetchConfig() {
     const res = await fetch("/api/config");
@@ -72,18 +74,29 @@ export default function SettingsPage() {
 
   async function addPackage(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/config", {
+    const clientError = validatePackageName(pkgRegistry, pkgName);
+    if (clientError) {
+      setPkgError(clientError);
+      return;
+    }
+    setPkgError(null);
+    const res = await fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "package",
         data: {
           registry: pkgRegistry,
-          name: pkgName,
+          name: pkgName.trim(),
           displayName: pkgDisplayName || undefined,
         },
       }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setPkgError(data.error || `Request failed (${res.status})`);
+      return;
+    }
     setPkgName("");
     setPkgDisplayName("");
     setShowPkgForm(false);
@@ -211,7 +224,10 @@ export default function SettingsPage() {
                     <label className="text-sm font-medium block mb-1">Registry</label>
                     <select
                       value={pkgRegistry}
-                      onChange={(e) => setPkgRegistry(e.target.value)}
+                      onChange={(e) => {
+                        setPkgRegistry(e.target.value);
+                        setPkgError(null);
+                      }}
                       className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                     >
                       <option value="npm">npm</option>
@@ -223,7 +239,10 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       value={pkgName}
-                      onChange={(e) => setPkgName(e.target.value)}
+                      onChange={(e) => {
+                        setPkgName(e.target.value);
+                        setPkgError(null);
+                      }}
                       className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                       placeholder="@anthropic-ai/sdk"
                       required
@@ -240,9 +259,22 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
+                {pkgError && (
+                  <p className="text-sm text-red-600" role="alert">{pkgError}</p>
+                )}
                 <div className="flex gap-2">
                   <Button type="submit" size="sm">Add</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setShowPkgForm(false)}>Cancel</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowPkgForm(false);
+                      setPkgError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </form>
             )}

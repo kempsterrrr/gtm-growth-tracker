@@ -41,7 +41,16 @@ DDL.
 
 ### Configuration flow
 
-`gtm-config.yaml` is the source of truth for which repos/packages are tracked. `src/scripts/sync-config.ts` upserts it into `tracked_repos`/`tracked_packages` on every collect run. The Settings page edits the YAML through `src/app/api/config/route.ts`, so config changes can come from either the file or the UI. Package names are validated with `src/lib/validation/package-name.ts`.
+`gtm-config.yaml` is the source of truth for which repos/packages are tracked;
+the `tracked_repos`/`tracked_packages` tables are a one-directional projection
+of it. `src/lib/config/gtm-config.ts` is the ONLY module that reads or writes
+the file: zod-validated parsing (`readConfig`), YAML-first writes
+(`addRepo`/`addPackage` — DB projection only after a successful file write),
+and `syncToDatabase` (the pipeline's `config-sync` step; malformed YAML fails
+the step with a path-named message). Package names are validated by
+`src/lib/validation/package-name.ts` (client-safe), enforced inside the config
+module on every add and parse. The Settings page edits config through
+`src/app/api/config/route.ts`, a thin caller of the module.
 
 ### Deployment & data lifecycle
 
