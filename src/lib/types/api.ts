@@ -14,6 +14,7 @@ export type { TrackedEvent } from "./events";
 export type {
   CompanySummary,
   CompanyDetail,
+  CompanySegment,
   FiredAlert,
   AlertRuleType,
 } from "./sales-intelligence";
