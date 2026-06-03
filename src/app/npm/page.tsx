@@ -1,180 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Header } from "@/components/layout/Header";
+import { useState } from "react";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
-import { MetricCard } from "@/components/charts/MetricCard";
-import { Select } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useDashboardFilters } from "@/lib/hooks/use-dashboard-filters";
-import { toIsoDate } from "@/lib/dates";
-import type { EventCategory } from "@/lib/types/events";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMetricPage, type MetricPageConfig } from "@/components/metric-page/use-metric-page";
+import { MetricPageShell, EmptyNotice } from "@/components/metric-page/MetricPageShell";
+import { aggregateWeekly, aggregateMonthly } from "./aggregate";
 import type { NpmPackageSummary, DownloadRow, TrackedEvent } from "@/lib/types/api";
 
-function aggregateWeekly(data: DownloadRow[]): Record<string, string | number>[] {
-  const weeks: Record<string, number> = {};
-  for (const d of data) {
-    const date = new Date(d.date);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const key = toIsoDate(weekStart);
-    weeks[key] = (weeks[key] || 0) + d.downloads;
-  }
-  return Object.entries(weeks).map(([date, downloads]) => ({ date, downloads }));
+interface NpmDetail {
+  downloads: DownloadRow[];
+  events: TrackedEvent[];
 }
 
-function aggregateMonthly(data: DownloadRow[]): Record<string, string | number>[] {
-  const months: Record<string, number> = {};
-  for (const d of data) {
-    const key = d.date.slice(0, 7) + "-01";
-    months[key] = (months[key] || 0) + d.downloads;
-  }
-  return Object.entries(months).map(([date, downloads]) => ({ date, downloads }));
-}
+const CONFIG: MetricPageConfig<NpmDetail> = {
+  listUrl: "/api/metrics/npm",
+  detailUrls: (id, qs) => [`/api/metrics/npm?${qs({ packageId: id })}`, `/api/events?${qs()}`],
+  combineDetail: ([downloads, events]) => ({
+    downloads: downloads as DownloadRow[],
+    events: events as TrackedEvent[],
+  }),
+};
 
 export default function NpmPage() {
-  const { dateRange, setDateRange, persona, setPersona, buildQueryString } =
-    useDashboardFilters();
-
-  const [packages, setPackages] = useState<NpmPackageSummary[]>([]);
-  const [selectedPkg, setSelectedPkg] = useState<string>("");
-  const [chartData, setChartData] = useState<DownloadRow[]>([]);
-  const [events, setEvents] = useState<TrackedEvent[]>([]);
+  const page = useMetricPage<NpmPackageSummary, NpmDetail>(CONFIG);
   const [aggregation, setAggregation] = useState("daily");
-  const [loading, setLoading] = useState(true);
 
-  // Fetch package list
-  useEffect(() => {
-    fetch("/api/metrics/npm")
-      .then((r) => r.json())
-      .then((data: NpmPackageSummary[]) => {
-        setPackages(data);
-        if (data.length > 0 && !selectedPkg) {
-          setSelectedPkg(String(data[0].id));
-        }
-      });
-  }, []);
-
-  // Fetch chart data when selection changes
-  useEffect(() => {
-    if (!selectedPkg) return;
-    setLoading(true);
-
-    const qs = buildQueryString({ packageId: selectedPkg });
-
-    Promise.all([
-      fetch(`/api/metrics/npm?${qs}`).then((r) => r.json()),
-      fetch(`/api/events?${buildQueryString()}`).then((r) => r.json()),
-    ])
-      .then(([downloads, evts]: [DownloadRow[], TrackedEvent[]]) => {
-        setChartData(downloads);
-        setEvents(evts);
-      })
-      .finally(() => setLoading(false));
-  }, [selectedPkg, dateRange, buildQueryString]);
-
-  const currentPkg = packages.find((p) => String(p.id) === selectedPkg);
-
+  const chartData = page.detail?.downloads ?? [];
   const displayData =
     aggregation === "weekly"
       ? aggregateWeekly(chartData)
       : aggregation === "monthly"
         ? aggregateMonthly(chartData)
         : chartData.map((d) => ({ date: d.date, downloads: d.downloads }));
-
   const totalDownloads = chartData.reduce((s, d) => s + d.downloads, 0);
 
   return (
-    <div className="flex flex-col h-full">
-      <Header
-        title="npm Downloads"
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        persona={persona}
-        onPersonaChange={(p) => setPersona(p as typeof persona)}
-      />
-
-      <div className="flex-1 p-6 space-y-6">
-        {/* Package selector */}
-        {packages.length > 0 && (
-          <div className="flex items-center gap-4">
-            <Select
-              options={packages.map((p) => ({
-                value: String(p.id),
-                label: p.displayName || p.name,
-              }))}
-              value={selectedPkg}
-              onChange={(e) => setSelectedPkg(e.target.value)}
-              className="w-64"
-            />
+    <MetricPageShell
+      title="npm Downloads"
+      dateRange={page.dateRange}
+      onDateRangeChange={page.setDateRange}
+      persona={page.persona}
+      onPersonaChange={(p) => page.setPersona(p as typeof page.persona)}
+      entities={page.entities}
+      selected={page.selected}
+      onSelect={page.setSelected}
+      entityLabel={(p) => p.displayName || p.name}
+      status={page.status}
+      error={page.error}
+      onRetry={page.retry}
+      emptyMessage="No npm packages tracked. Add packages in Settings."
+      cardColumns={4}
+      cards={
+        page.current
+          ? [
+              {
+                title: "Weekly Downloads",
+                value: page.current.downloadsLast7d,
+                delta: page.current.growthPercent7d,
+                description: "vs previous week",
+              },
+              { title: "Total in Period", value: totalDownloads },
+            ]
+          : []
+      }
+    >
+      {displayData.length > 0 ? (
+        <div className="border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Downloads - {page.current?.displayName || page.current?.name}
+            </h3>
+            <Tabs defaultValue="daily">
+              <TabsList>
+                <TabsTrigger value="daily" onClick={() => setAggregation("daily")}>
+                  Daily
+                </TabsTrigger>
+                <TabsTrigger value="weekly" onClick={() => setAggregation("weekly")}>
+                  Weekly
+                </TabsTrigger>
+                <TabsTrigger value="monthly" onClick={() => setAggregation("monthly")}>
+                  Monthly
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        )}
-
-        {/* Metric cards */}
-        {currentPkg && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard
-              title="Weekly Downloads"
-              value={currentPkg.downloadsLast7d}
-              delta={currentPkg.growthPercent7d}
-              description="vs previous week"
-            />
-            <MetricCard
-              title="Total in Period"
-              value={totalDownloads}
-            />
-          </div>
-        )}
-
-        {/* Chart */}
-        {!loading && displayData.length > 0 && (
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Downloads - {currentPkg?.displayName || currentPkg?.name}
-              </h3>
-              <Tabs defaultValue="daily">
-                <TabsList>
-                  <TabsTrigger value="daily" onClick={() => setAggregation("daily")}>
-                    Daily
-                  </TabsTrigger>
-                  <TabsTrigger value="weekly" onClick={() => setAggregation("weekly")}>
-                    Weekly
-                  </TabsTrigger>
-                  <TabsTrigger value="monthly" onClick={() => setAggregation("monthly")}>
-                    Monthly
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            <TimeSeriesChart
-              data={displayData}
-              metrics={[
-                {
-                  key: "downloads",
-                  label: "Downloads",
-                  color: "var(--chart-1)",
-                  type: aggregation === "daily" ? "area" : "bar",
-                },
-              ]}
-              events={events}
-              height={400}
-            />
-          </div>
-        )}
-
-        {!loading && chartData.length === 0 && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            No download data available. Run the data collector first.
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            Loading...
-          </div>
-        )}
-      </div>
-    </div>
+          <TimeSeriesChart
+            data={displayData}
+            metrics={[
+              {
+                key: "downloads",
+                label: "Downloads",
+                color: "var(--chart-1)",
+                type: aggregation === "daily" ? "area" : "bar",
+              },
+            ]}
+            events={page.detail?.events}
+            height={400}
+          />
+        </div>
+      ) : (
+        <EmptyNotice message="No download data available. Run the data collector first." />
+      )}
+    </MetricPageShell>
   );
 }
