@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db/client";
 import { trackedRepos, trackedPackages } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import { addRepo, addPackage, ConfigError } from "@/lib/config/gtm-config";
+import type { ConfigResponse } from "@/lib/types/api";
 
 export async function GET() {
   const db = getDb();
@@ -10,7 +11,8 @@ export async function GET() {
   const repos = db.select().from(trackedRepos).all();
   const packages = db.select().from(trackedPackages).all();
 
-  return NextResponse.json({ repos, packages });
+  const payload: ConfigResponse = { repos, packages };
+  return NextResponse.json(payload);
 }
 
 export async function POST(request: NextRequest) {

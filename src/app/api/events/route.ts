@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { TrackedEvent } from "@/lib/types/api";
 import { events } from "@/lib/db/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (repoId) conditions.push(eq(events.repoId, parseInt(repoId)));
   if (packageId) conditions.push(eq(events.packageId, parseInt(packageId)));
 
-  const result = db
+  const result: TrackedEvent[] = db
     .select()
     .from(events)
     .where(conditions.length > 0 ? and(...conditions) : undefined)

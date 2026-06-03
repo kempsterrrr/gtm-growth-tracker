@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { DependencySummary, DependencyDetailResponse } from "@/lib/types/api";
 import {
   reverseDependencies,
   reverseDependencyCounts,
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     // Return all packages with their latest dep counts
     const packages = db.select().from(trackedPackages).all();
 
-    const summaries = packages.map((pkg) => {
+    const summaries: DependencySummary[] = packages.map((pkg) => {
       const latest = db
         .select()
         .from(reverseDependencyCounts)
@@ -70,5 +71,6 @@ export async function GET(request: NextRequest) {
     .orderBy(desc(reverseDependencies.firstSeen))
     .all();
 
-  return NextResponse.json({ counts, dependents });
+  const payload: DependencyDetailResponse = { counts, dependents };
+  return NextResponse.json(payload);
 }

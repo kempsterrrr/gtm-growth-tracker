@@ -36,7 +36,8 @@ export interface CompanySummary {
   scoreTrend: number; // change vs 7 days ago
 }
 
-export interface CompanyDetail extends CompanySummary {
+// The detail route does not compute scoreTrend — the contract matches reality
+export interface CompanyDetail extends Omit<CompanySummary, "scoreTrend"> {
   users: CompanyUser[];
   scoreHistory: Array<{ date: string; score: number }>;
 }
@@ -73,7 +74,8 @@ export interface FiredAlert {
   userId: number | null;
   title: string;
   detail: string | null;
-  slackSent: boolean;
-  acknowledged: boolean;
+  // SQLite integers on the wire (0/1) — the contract matches reality
+  slackSent: number;
+  acknowledged: number;
   firedAt: string;
 }

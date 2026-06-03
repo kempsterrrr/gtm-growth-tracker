@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { FiredAlert } from "@/lib/types/api";
 import { alertEvents, alertRules, companies } from "@/lib/db/schema";
 import { sql, desc, eq } from "drizzle-orm";
 
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     conditions.push(sql`${alertEvents.acknowledged} = 0`);
   }
 
-  const results = db
+  const results: FiredAlert[] = db
     .select({
       id: alertEvents.id,
       ruleId: alertEvents.ruleId,

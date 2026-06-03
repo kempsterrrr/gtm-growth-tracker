@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { GithubRepoSummary, GithubRepoMetricsResponse } from "@/lib/types/api";
 import {
   trackedRepos,
   githubRepoMetrics,
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (!repoId) {
     const repos = db.select().from(trackedRepos).all();
 
-    const summaries = repos.map((repo) => {
+    const summaries: GithubRepoSummary[] = repos.map((repo) => {
       const latest = db
         .select()
         .from(githubRepoMetrics)
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
   if (startDate) dateFilters.push(gte(githubRepoMetrics.date, startDate));
   if (endDate) dateFilters.push(lte(githubRepoMetrics.date, endDate));
 
-  const result: Record<string, unknown> = {};
+  const result: GithubRepoMetricsResponse = {};
 
   if (!metric || metric === "stars" || metric === "all") {
     result.metrics = db

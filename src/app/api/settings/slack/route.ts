@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import type { SlackSettingsResponse } from "@/lib/types/api";
 import { slackConfig } from "@/lib/db/schema";
 import { sendSlackWebhook } from "@/lib/api-clients/slack-client";
 import { sql } from "drizzle-orm";
@@ -8,13 +9,14 @@ export async function GET() {
   const db = getDb();
   const config = db.select().from(slackConfig).where(sql`${slackConfig.id} = 1`).get();
 
-  return NextResponse.json({
+  const payload: SlackSettingsResponse = {
     configured: !!config?.webhookUrl,
     channelName: config?.channelName || "",
     enabled: !!config?.enabled,
     // Don't expose the full webhook URL for security
     webhookUrlSet: !!config?.webhookUrl,
-  });
+  };
+  return NextResponse.json(payload);
 }
 
 export async function POST(request: NextRequest) {

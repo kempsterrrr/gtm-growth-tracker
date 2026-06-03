@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db/client";
 import { npmDownloads, trackedPackages } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { daysAgoIso, growthPercent } from "@/lib/dates";
+import type { NpmPackageSummary, DownloadRow } from "@/lib/types/api";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (!packageId) {
     const packages = db.select().from(trackedPackages).where(eq(trackedPackages.registry, "npm")).all();
 
-    const summaries = packages.map((pkg) => {
+    const summaries: NpmPackageSummary[] = packages.map((pkg) => {
       const last7d = db
         .select({ total: sql<number>`SUM(${npmDownloads.downloads})` })
         .from(npmDownloads)
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
   if (startDate) conditions.push(gte(npmDownloads.date, startDate));
   if (endDate) conditions.push(lte(npmDownloads.date, endDate));
 
-  const data = db
+  const data: DownloadRow[] = db
     .select({
       date: npmDownloads.date,
       downloads: npmDownloads.downloads,
