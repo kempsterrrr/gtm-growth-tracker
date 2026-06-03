@@ -123,13 +123,13 @@ describe("competitor backfill on first collection", () => {
     // cap gets consumed by PR rows before reaching a single true issue.
     expect(calls["rival-repo"].stars[0].maxPages).toBe(60);
     expect(calls["rival-repo"].forks[0].maxPages).toBe(60);
-    expect(calls["rival-repo"].issuesSince[0]).toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["rival-repo"].issuesSince[0]).toBe("2008-01-01T00:00:00Z");
     expect(calls["rival-repo"].issuesOpts[0].maxPages).toBe(60);
     expect(calls["rival-repo"].prs[0].maxPages).toBe(20);
 
     // Own repo: existing behavior (5-page cap, ~90-day issue window)
     expect(calls["own-repo"].stars[0].maxPages).toBe(5);
-    expect(calls["own-repo"].issuesSince[0]).not.toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["own-repo"].issuesSince[0]).not.toBe("2008-01-01T00:00:00Z");
     expect(calls["own-repo"].issuesOpts[0].maxPages).toBe(5);
     expect(calls["own-repo"].prs[0].maxPages).toBe(3);
 
@@ -168,7 +168,7 @@ describe("competitor backfill on first collection", () => {
 
     expect(calls["rival-repo"].stars[1].maxPages).toBe(5);
     expect(calls["rival-repo"].forks[1].maxPages).toBe(5);
-    expect(calls["rival-repo"].issuesSince[1]).not.toBe("1970-01-01T00:00:00.000Z");
+    expect(calls["rival-repo"].issuesSince[1]).not.toBe("2008-01-01T00:00:00Z");
     expect(calls["rival-repo"].issuesOpts[1].maxPages).toBe(5);
     expect(calls["rival-repo"].prs[1].maxPages).toBe(3);
   });
