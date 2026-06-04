@@ -9,7 +9,8 @@ import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
 import { EngagementBadges } from "@/components/companies/EngagementBadges";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Globe, MapPin } from "lucide-react";
-import { formatEngagementBreakdown, formatDependentCount } from "../transforms";
+import { formatEngagementBreakdown, formatDependentCount, formatRelativeAge } from "../transforms";
+import { todayIso } from "@/lib/dates";
 import type {
   CompanyDetail,
   CompanyUser,
@@ -77,6 +78,16 @@ export default function CompanyDetailPage() {
             {company.segment === "prospect" ? "net-new prospect" : company.segment}
           </Badge>
         </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Last engaged us:{" "}
+          {company.lastOwnEngagementAt
+            ? formatRelativeAge(company.lastOwnEngagementAt, todayIso())
+            : "—"}{" "}
+          · Last on competitor repos:{" "}
+          {company.lastCompetitorEngagementAt
+            ? formatRelativeAge(company.lastCompetitorEngagementAt, todayIso())
+            : "—"}
+        </p>
       </header>
 
       <div className="flex-1 p-6 space-y-6">
