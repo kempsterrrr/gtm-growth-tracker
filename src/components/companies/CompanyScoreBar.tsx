@@ -6,13 +6,16 @@ interface CompanyScoreBarProps {
   commitCount: number;
 }
 
-const SEGMENTS = [
-  { key: "commitCount" as const, label: "Commits", color: "#5427C8" },
-  { key: "prCount" as const, label: "PRs", color: "#7C5CE7" },
-  { key: "issueCount" as const, label: "Issues", color: "#22c55e" },
-  { key: "forkCount" as const, label: "Forks", color: "#3b82f6" },
-  { key: "starCount" as const, label: "Stars", color: "#eab308" },
+/** THE event-type color scale — ordered by demand significance and drawn
+ *  from the chart palette so every surface (bars, charts, legends) agrees. */
+export const EVENT_TYPE_SCALE = [
+  { key: "issueCount" as const, label: "Issues", color: "var(--chart-1)" },
+  { key: "forkCount" as const, label: "Forks", color: "var(--chart-2)" },
+  { key: "starCount" as const, label: "Stars", color: "var(--chart-3)" },
+  { key: "prCount" as const, label: "PRs", color: "var(--chart-5)" },
+  { key: "commitCount" as const, label: "Commits", color: "var(--chart-4)" },
 ];
+const SEGMENTS = EVENT_TYPE_SCALE;
 
 export function CompanyScoreBar(props: CompanyScoreBarProps) {
   const total = SEGMENTS.reduce((s, seg) => s + (props[seg.key] || 0), 0);

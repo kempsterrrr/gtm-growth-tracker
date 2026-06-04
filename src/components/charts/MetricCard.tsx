@@ -17,7 +17,7 @@ export function MetricCard({ title, value, delta, description, icon }: MetricCar
     typeof value === "number" ? value.toLocaleString() : value;
 
   return (
-    <Card>
+    <Card className="border-l-2 border-l-primary/60 bg-card">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
@@ -25,7 +25,9 @@ export function MetricCard({ title, value, delta, description, icon }: MetricCar
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{formattedValue}</div>
+        <div className="text-3xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+          {formattedValue}
+        </div>
         <div className="flex items-center gap-2 mt-1">
           {delta !== undefined && (
             <Badge

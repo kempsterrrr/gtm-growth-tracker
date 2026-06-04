@@ -27,6 +27,7 @@ export default function PeoplePage() {
   const [entity, setEntity] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityWindow>("all");
   const [sort, setSort] = useState<PersonSortSpec | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetch("/api/people")
@@ -165,7 +166,10 @@ export default function PeoplePage() {
                                     {person.login}
                                   </a>
                                   {person.competitorEmployee && (
-                                    <Badge variant="destructive" className="text-xs">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs text-amber-600 border-amber-500/60"
+                                    >
                                       {person.competitorEmployee} employee
                                     </Badge>
                                   )}
@@ -178,16 +182,17 @@ export default function PeoplePage() {
                           </td>
                           <td className="px-4 py-2">
                             {person.primaryCompany ? (
-                              <div className="flex items-center gap-2">
+                              <div className="whitespace-nowrap">
                                 <Link
                                   href={`/companies/${person.primaryCompany.id}`}
                                   className="text-primary hover:underline"
                                 >
                                   {person.primaryCompany.name}
                                 </Link>
-                                <Badge variant="outline" className="text-xs">
-                                  {person.primaryCompany.source.replace("_", " ")}
-                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {" "}
+                                  · {person.primaryCompany.source.replace("_", " ")}
+                                </span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>
@@ -195,7 +200,10 @@ export default function PeoplePage() {
                           </td>
                           <td className="px-4 py-2">
                             <div className="space-y-0.5">
-                              {person.engagements.map((e) => (
+                              {(expanded.has(person.id)
+                                ? person.engagements
+                                : person.engagements.slice(0, 2)
+                              ).map((e) => (
                                 <div
                                   key={e.entity}
                                   className={`text-xs ${entity === e.entity ? "font-semibold" : ""}`}
@@ -212,6 +220,23 @@ export default function PeoplePage() {
                                   </span>
                                 </div>
                               ))}
+                              {person.engagements.length > 2 && (
+                                <button
+                                  className="text-xs text-primary hover:underline"
+                                  onClick={() =>
+                                    setExpanded((cur) => {
+                                      const next = new Set(cur);
+                                      if (next.has(person.id)) next.delete(person.id);
+                                      else next.add(person.id);
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  {expanded.has(person.id)
+                                    ? "show less"
+                                    : `+${person.engagements.length - 2} more`}
+                                </button>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-2 text-right text-muted-foreground">
