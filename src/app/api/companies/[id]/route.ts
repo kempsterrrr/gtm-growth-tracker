@@ -219,6 +219,26 @@ export async function GET(
     };
   });
 
+  // Entity labels with activity — same derivation as the list route.
+  const repoEntities = db
+    .select({ owner: trackedRepos.owner, name: trackedRepos.name })
+    .from(companyScores)
+    .innerJoin(trackedRepos, sql`${companyScores.repoId} = ${trackedRepos.id}`)
+    .where(sql`${companyScores.companyId} = ${companyId} AND ${companyScores.repoId} IS NOT NULL`)
+    .groupBy(companyScores.repoId)
+    .all();
+  const pkgEntities = db
+    .select({ name: trackedPackages.name })
+    .from(companyCompetitorSignals)
+    .innerJoin(trackedPackages, sql`${companyCompetitorSignals.packageId} = ${trackedPackages.id}`)
+    .where(sql`${companyCompetitorSignals.companyId} = ${companyId}`)
+    .groupBy(companyCompetitorSignals.packageId)
+    .all();
+  const activeEntities = [
+    ...repoEntities.map((r) => `${r.owner}/${r.name}`),
+    ...pkgEntities.map((p) => p.name),
+  ];
+
   const ownScore = latestScore?.score || 0;
   const competitorScore = latestCompetitorScore?.score || 0;
   const payload: CompanyDetail = {
@@ -228,6 +248,7 @@ export async function GET(
     segment: deriveSegment(ownScore, competitorScore),
     lastOwnEngagementAt: latestScore?.lastEventDate ?? null,
     lastCompetitorEngagementAt: latestCompetitorScore?.lastEventDate ?? null,
+    activeEntities,
     userCount: latestScore?.userCount || 0,
     starCount: latestScore?.starCount || 0,
     forkCount: latestScore?.forkCount || 0,
