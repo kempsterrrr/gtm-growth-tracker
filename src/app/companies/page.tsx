@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MetricCard } from "@/components/charts/MetricCard";
-import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, Users, Star } from "lucide-react";
 import {
@@ -22,10 +20,10 @@ import {
 import { todayIso } from "@/lib/dates";
 import type { CompanySummary, CompanySegment } from "@/lib/types/sales-intelligence";
 
-const SEGMENT_BADGE: Record<CompanySegment, "default" | "secondary" | "outline"> = {
-  prospect: "default",
-  battleground: "secondary",
-  engaged: "outline",
+const SEGMENT_DOT: Record<CompanySegment, string> = {
+  prospect: "bg-primary",
+  battleground: "bg-amber-500",
+  engaged: "bg-muted-foreground/40",
 };
 
 export default function CompaniesPage() {
@@ -119,31 +117,35 @@ export default function CompaniesPage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Tabs defaultValue="all">
-                <TabsList>
-                  <TabsTrigger value="all" onClick={() => setActivity("all")}>
-                    Any time
-                  </TabsTrigger>
-                  <TabsTrigger value="90d" onClick={() => setActivity("90d")}>
-                    Active 90d
-                  </TabsTrigger>
-                  <TabsTrigger value="30d" onClick={() => setActivity("30d")}>
-                    Active 30d
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <select
-                value={entity ?? ""}
-                onChange={(e) => setEntity(e.target.value || null)}
-                className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm"
-              >
-                <option value="">All entities</option>
-                {entityOptions.map((label) => (
-                  <option key={label} value={label}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              {/* Narrowing controls: quieter, right-aligned — the segment
+                  tabs are the view; these are refinements. */}
+              <div className="flex items-center gap-2 ml-auto text-sm">
+                <Tabs defaultValue="all">
+                  <TabsList className="h-8">
+                    <TabsTrigger value="all" onClick={() => setActivity("all")}>
+                      Any time
+                    </TabsTrigger>
+                    <TabsTrigger value="90d" onClick={() => setActivity("90d")}>
+                      90d
+                    </TabsTrigger>
+                    <TabsTrigger value="30d" onClick={() => setActivity("30d")}>
+                      30d
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <select
+                  value={entity ?? ""}
+                  onChange={(e) => setEntity(e.target.value || null)}
+                  className="rounded-md border border-input bg-transparent px-2 py-1.5 text-sm text-muted-foreground"
+                >
+                  <option value="">All entities</option>
+                  {entityOptions.map((label) => (
+                    <option key={label} value={label}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
@@ -155,13 +157,11 @@ export default function CompaniesPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left px-4 py-2 font-medium w-8">#</th>
                         <th className="text-left px-4 py-2 font-medium">
                           <button className="hover:text-foreground" onClick={() => toggleSort("name")}>
                             Company{sortIndicator("name")}
                           </button>
                         </th>
-                        <th className="text-left px-4 py-2 font-medium">Domain</th>
                         <th className="text-right px-4 py-2 font-medium">
                           <button
                             className="hover:text-foreground"
@@ -178,8 +178,7 @@ export default function CompaniesPage() {
                             Competitor{sortIndicator("competitorScore")}
                           </button>
                         </th>
-                        <th className="text-left px-4 py-2 font-medium">Segment</th>
-                        <th className="text-right px-4 py-2 font-medium">
+                        <th className="text-right px-4 py-2 font-medium whitespace-nowrap">
                           <button
                             className="hover:text-foreground"
                             onClick={() => toggleSort("lastActive")}
@@ -197,23 +196,26 @@ export default function CompaniesPage() {
                             Users{sortIndicator("users")}
                           </button>
                         </th>
-                        <th className="text-left px-4 py-2 font-medium w-48">Breakdown</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visible.map((company, i) => (
+                      {visible.map((company) => (
                         <tr key={company.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
                           <td className="px-4 py-2">
-                            <Link
-                              href={`/companies/${company.id}`}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              {company.name}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2 text-muted-foreground">
-                            {company.domain || "—"}
+                            <div className="flex items-center gap-2">
+                              {segment === "all" && (
+                                <span
+                                  className={`inline-block h-2 w-2 rounded-full shrink-0 ${SEGMENT_DOT[company.segment]}`}
+                                  title={company.segment}
+                                />
+                              )}
+                              <Link
+                                href={`/companies/${company.id}`}
+                                className="font-medium text-primary hover:underline"
+                              >
+                                {company.name}
+                              </Link>
+                            </div>
                           </td>
                           <td className="px-4 py-2 text-right font-medium">
                             {company.score.toFixed(0)}
@@ -223,41 +225,27 @@ export default function CompaniesPage() {
                               ? company.competitorScore.toFixed(0)
                               : "—"}
                           </td>
-                          <td className="px-4 py-2">
-                            <Badge variant={SEGMENT_BADGE[company.segment]} className="text-xs">
-                              {company.segment === "prospect"
-                                ? "net-new prospect"
-                                : company.segment}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-2 text-right text-muted-foreground">
+                          <td className="px-4 py-2 text-right text-muted-foreground whitespace-nowrap">
                             {latestActivity(company)
                               ? formatRelativeAge(latestActivity(company)!, todayIso())
                               : "—"}
                           </td>
-                          <td className="px-4 py-2 text-right">
-                            {company.scoreTrend > 0 ? (
-                              <Badge variant="secondary" className="text-xs text-green-600">
-                                +{company.scoreTrend.toFixed(0)}
-                              </Badge>
-                            ) : company.scoreTrend < 0 ? (
-                              <Badge variant="secondary" className="text-xs text-red-500">
-                                {company.scoreTrend.toFixed(0)}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                          <td
+                            className={`px-4 py-2 text-right text-xs whitespace-nowrap ${
+                              Math.abs(company.scoreTrend) >= 10
+                                ? company.scoreTrend > 0
+                                  ? "text-green-600 font-medium"
+                                  : "text-red-500 font-medium"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {company.scoreTrend > 0
+                              ? `↑ ${company.scoreTrend.toFixed(0)}`
+                              : company.scoreTrend < 0
+                                ? `↓ ${Math.abs(company.scoreTrend).toFixed(0)}`
+                                : "—"}
                           </td>
                           <td className="px-4 py-2 text-right">{company.userCount}</td>
-                          <td className="px-4 py-2">
-                            <CompanyScoreBar
-                              starCount={company.starCount}
-                              forkCount={company.forkCount}
-                              issueCount={company.issueCount}
-                              prCount={company.prCount}
-                              commitCount={company.commitCount}
-                            />
-                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -121,6 +121,7 @@ export function TimeSeriesChart({
       <ComposedChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
         <XAxis
+          minTickGap={32}
           dataKey="date"
           tickFormatter={formatXAxisDate}
           tick={{ fontSize: 12 }}
@@ -185,12 +186,8 @@ export function TimeSeriesChart({
             stroke={EVENT_CATEGORY_COLORS[event.category]}
             strokeDasharray="4 4"
             strokeWidth={1.5}
-            label={{
-              value: event.title.length > 20 ? event.title.slice(0, 20) + "..." : event.title,
-              position: "top",
-              fill: EVENT_CATEGORY_COLORS[event.category],
-              fontSize: 10,
-            }}
+            // Labels collided into an unreadable smear on dense charts — the
+            // custom tooltip already lists that day's events on hover.
           />
         ))}
       </ComposedChart>

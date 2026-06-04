@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { MetricCard } from "@/components/charts/MetricCard";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
-import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
+import { CompanyScoreBar, EVENT_TYPE_SCALE } from "@/components/companies/CompanyScoreBar";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Globe, MapPin } from "lucide-react";
 import { formatEngagementBreakdown, formatDependentCount, formatRelativeAge } from "../transforms";
@@ -89,34 +89,60 @@ export default function CompanyDetailPage() {
       </header>
 
       <div className="flex-1 p-6 space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <MetricCard title="Score" value={company.score.toFixed(0)} />
-          <MetricCard title="Competitor Score" value={company.competitorScore.toFixed(0)} />
-          <MetricCard title="Users" value={company.userCount} />
-          <MetricCard title="Stars" value={company.starCount} />
-          <MetricCard title="PRs" value={company.prCount} />
-          <MetricCard title="Commits" value={company.commitCount} />
+        {/* Two scores, two stories — the only numbers that rank this company */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <MetricCard
+            title="Our Engagement"
+            value={company.score.toFixed(0)}
+            description={
+              company.lastOwnEngagementAt
+                ? `last active ${formatRelativeAge(company.lastOwnEngagementAt, todayIso())}`
+                : "no live engagement"
+            }
+          />
+          <MetricCard
+            title="Competitor Engagement"
+            value={company.competitorScore.toFixed(0)}
+            description={
+              company.lastCompetitorEngagementAt
+                ? `last active ${formatRelativeAge(company.lastCompetitorEngagementAt, todayIso())}`
+                : company.competitorScore > 0
+                  ? "via package dependencies"
+                  : "none"
+            }
+          />
+          {company.userCount > 0 && <MetricCard title="People Here" value={company.userCount} />}
         </div>
 
-        {/* Score composition */}
-        <div className="border rounded-lg p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Score Breakdown</h3>
-          <CompanyScoreBar
-            starCount={company.starCount}
-            forkCount={company.forkCount}
-            issueCount={company.issueCount}
-            prCount={company.prCount}
-            commitCount={company.commitCount}
-          />
-          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            <span>Stars: {company.starCount}</span>
-            <span>Forks: {company.forkCount}</span>
-            <span>Issues: {company.issueCount}</span>
-            <span>PRs: {company.prCount}</span>
-            <span>Commits: {company.commitCount}</span>
+        {/* Score composition — only when there's something to compose */}
+        {company.starCount +
+          company.forkCount +
+          company.issueCount +
+          company.prCount +
+          company.commitCount >
+          0 && (
+          <div className="border rounded-lg p-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Engagement Mix</h3>
+            <CompanyScoreBar
+              starCount={company.starCount}
+              forkCount={company.forkCount}
+              issueCount={company.issueCount}
+              prCount={company.prCount}
+              commitCount={company.commitCount}
+            />
+            <div className="flex gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+              {EVENT_TYPE_SCALE.map((seg) => (
+                <span key={seg.key} className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: seg.color }}
+                  />
+                  {seg.label}: {company[seg.key]}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Competitor attribution — which competitor products this company uses */}
         {company.competitorAttribution && company.competitorAttribution.length > 0 && (
@@ -234,7 +260,10 @@ export default function CompanyDetailPage() {
                               <div className="font-medium flex items-center gap-2">
                                 {user.login}
                                 {user.competitorEmployee && (
-                                  <Badge variant="destructive" className="text-xs">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs text-amber-600 border-amber-500/60"
+                                  >
                                     {user.competitorEmployee} employee
                                   </Badge>
                                 )}

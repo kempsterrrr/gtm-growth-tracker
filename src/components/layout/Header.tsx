@@ -11,7 +11,7 @@ const dateRangeOptions = [
 ];
 
 const personaOptions = [
-  { value: "all", label: "All Metrics" },
+  { value: "all", label: "All roles" },
   { value: "marketing", label: "Marketing" },
   { value: "sales", label: "Sales" },
   { value: "engineering", label: "Engineering" },
