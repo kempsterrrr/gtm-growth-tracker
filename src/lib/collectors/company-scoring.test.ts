@@ -293,6 +293,27 @@ describe("scoreCompanies with competitor attribution", () => {
     expect(aggFor(orgNoiseCo)).toEqual([]); // the org link contributes nothing
   });
 
+  it("purges same-day aggregates of companies that no longer qualify at all", async () => {
+    // A company whose rows were written earlier today under older rules, but
+    // which now has no primary links and no signals — the early skip must
+    // still clean its stale rows.
+    run("INSERT INTO companies (name, domain) VALUES ('GhostCo', 'ghost.io')");
+    const ghost = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='GhostCo'").get() as { id: number }
+    ).id;
+    run(
+      "INSERT INTO company_scores (company_id, repo_id, scope, date, score, user_count) VALUES (?, NULL, 'own', ?, 9, 1)",
+      ghost,
+      todayIso()
+    );
+
+    await scoreCompanies();
+    const rows = sqlite
+      .prepare("SELECT COUNT(*) AS n FROM company_scores WHERE company_id = ? AND repo_id IS NULL AND date = ?")
+      .get(ghost, todayIso()) as { n: number };
+    expect(rows.n).toBe(0);
+  });
+
   it("never writes a competitor aggregate for the competitor's own company", async () => {
     // A company named after the tracked competitor, with real engagement on
     // the competitor repo — it must not rank as its own prospect.

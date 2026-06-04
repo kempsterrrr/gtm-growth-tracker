@@ -124,7 +124,16 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
       .groupBy(companyCompetitorSignals.packageId)
       .all();
 
-    if (userLinks.length === 0 && signalCounts.length === 0) continue;
+    if (userLinks.length === 0 && signalCounts.length === 0) {
+      // Still purge any same-day rows written under earlier rules (e.g. a
+      // rule change mid-day) — otherwise they linger as ghost aggregates.
+      db.delete(companyScores)
+        .where(
+          sql`${companyScores.companyId} = ${company.id} AND ${companyScores.repoId} IS NULL AND ${companyScores.date} = ${today}`
+        )
+        .run();
+      continue;
+    }
     const userIds = userLinks.map((u) => u.userId);
 
     // Two aggregates that never blend: own-engagement and competitor-engagement
