@@ -55,6 +55,21 @@ export interface CompanySummary {
   scoreTrend: number; // change vs 7 days ago (own score)
 }
 
+/** One row on the People page (PRD #42): every engaged human exactly once,
+ *  with their primary employer (and the signal that decided it), badges, and
+ *  per-entity engagement. */
+export interface PersonSummary {
+  id: number;
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  primaryCompany: { id: number; name: string; source: CompanySource } | null;
+  competitorEmployee: string | null;
+  competitorEmployeeSource: string | null;
+  engagements: EntityEngagement[];
+  lastActive: string | null;
+}
+
 /** A non-primary user-company link (PRD #42): visible context, zero score
  *  contribution. The source is the signal that created the link. */
 export interface AffiliatedUser {
