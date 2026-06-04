@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "../db/client";
 import { trackedRepos, trackedPackages } from "../db/schema";
 import { validatePackageName } from "../validation/package-name";
+import { DECAY_HALF_LIFE_DAYS, DECAY_MAX_AGE_DAYS, MIN_AGGREGATE_SCORE } from "../decay";
 
 /**
  * THE owner of gtm-config.yaml. The YAML file is the source of truth; the
@@ -50,6 +51,24 @@ const competitorDomainsSchema = z.object({
   domains: z.array(z.string().min(1)).default([]),
 });
 
+/** Recency-scoring knobs (PRD #34) — all three operator-tunable from the
+ *  Settings Scoring card. Cross-field rule keeps the event cutoff meaningfully
+ *  beyond the half-life. Absent block → the decay module's code defaults. */
+const scoringConfigSchema = z
+  .object({
+    half_life_days: z.number().int().min(7, "half_life_days must be at least 7").default(90),
+    max_age_days: z.number().int().default(360),
+    min_aggregate_score: z
+      .number()
+      .min(0, "min_aggregate_score must be between 0 and 5")
+      .max(5, "min_aggregate_score must be between 0 and 5")
+      .default(1.0),
+  })
+  .refine((s) => s.max_age_days >= 2 * s.half_life_days, {
+    message: "max_age_days must be at least 2× half_life_days",
+    path: ["max_age_days"],
+  });
+
 export const gtmConfigSchema = z.object({
   github: z
     .object({ repos: z.array(trackedRepoConfigSchema).default([]) })
@@ -61,12 +80,14 @@ export const gtmConfigSchema = z.object({
     })
     .default({ npm: [], pypi: [] }),
   competitors: z.record(z.string().min(1), competitorDomainsSchema).optional(),
+  scoring: scoringConfigSchema.optional(),
   collection: z.object({ npm_backfill_from: z.string().optional() }).optional(),
 });
 
 export type GtmConfig = z.infer<typeof gtmConfigSchema>;
 export type TrackedRepoConfig = z.infer<typeof trackedRepoConfigSchema>;
 export type TrackedPackageConfig = z.infer<typeof trackedPackageConfigSchema>;
+export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
 export type PackageRegistry = "npm" | "pypi";
 
 function defaultConfigPath(): string {
@@ -180,6 +201,38 @@ export function addPackage(
   }
   writeConfig(config, configPath); // YAML first
   syncToDatabase(configPath); // projection only after a successful write
+}
+
+/** YAML-first update of the scoring block (no DB projection — the scoring
+ *  step reads the file). Invalid knobs throw ConfigError before any write. */
+export function updateScoring(
+  scoring: Partial<ScoringConfig>,
+  configPath = defaultConfigPath()
+): void {
+  const parsed = scoringConfigSchema.safeParse(scoring);
+  if (!parsed.success) {
+    throw new ConfigError(
+      `Invalid scoring config: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`
+    );
+  }
+  const config = readConfig(configPath);
+  config.scoring = parsed.data;
+  writeConfig(config, configPath);
+}
+
+/** The decay knobs the scoring step should use: the configured block when
+ *  present, the decay module's code defaults otherwise (PRD #34: defaults
+ *  produce identical behavior to the unconfigured engine). */
+export function resolveScoringKnobs(scoring: ScoringConfig | undefined): {
+  halfLifeDays: number;
+  maxAgeDays: number;
+  minAggregateScore: number;
+} {
+  return {
+    halfLifeDays: scoring?.half_life_days ?? DECAY_HALF_LIFE_DAYS,
+    maxAgeDays: scoring?.max_age_days ?? DECAY_MAX_AGE_DAYS,
+    minAggregateScore: scoring?.min_aggregate_score ?? MIN_AGGREGATE_SCORE,
+  };
 }
 
 /** Projects the YAML (source of truth) into tracked_repos / tracked_packages.
