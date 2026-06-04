@@ -36,7 +36,8 @@ export function sortCompanies(
       return sign * av.localeCompare(bv);
     });
   }
-  return [...companies].sort((a, b) => sign * (a[sort.key] - b[sort.key]));
+  const key = sort.key; // narrowed to the numeric keys; const propagates into the closure
+  return [...companies].sort((a, b) => sign * (a[key] - b[key]));
 }
 
 /** The fresher of the two per-side timestamps (PRD #34), null when neither
