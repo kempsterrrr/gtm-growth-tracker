@@ -141,9 +141,17 @@ export interface TrackedPackageRow {
   repoId: number | null;
   competitor: string | null;
 }
+/** Recency-scoring knobs (PRD #34), resolved with defaults when the YAML
+ *  block is absent. */
+export interface ScoringSettings {
+  halfLifeDays: number;
+  maxAgeDays: number;
+  minAggregateScore: number;
+}
 export interface ConfigResponse {
   repos: TrackedRepoRow[];
   packages: TrackedPackageRow[];
+  scoring: ScoringSettings;
 }
 
 // ── /api/settings/slack ─────────────────────────────────────────────────

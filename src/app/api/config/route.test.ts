@@ -56,6 +56,45 @@ describe("/api/config (seeded temp DB)", () => {
     expect(readFileSync(path.join(tmp, "gtm-config.yaml"), "utf-8")).toContain("competitor: Acme");
   });
 
+  it("GET returns default scoring knobs when no block is configured", async () => {
+    const res = await GET();
+    const body = (await res.json()) as ConfigResponse;
+    expect(body.scoring).toEqual({ halfLifeDays: 90, maxAgeDays: 360, minAggregateScore: 1 });
+  });
+
+  it("POST round-trips a scoring update and rejects cross-field violations", async () => {
+    const ok = await POST(
+      new NextRequest("http://localhost/api/config", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "scoring",
+          data: { halfLifeDays: 30, maxAgeDays: 120, minAggregateScore: 0.5 },
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    expect(ok.status).toBe(200);
+    expect(readFileSync(path.join(tmp, "gtm-config.yaml"), "utf-8")).toContain(
+      "half_life_days: 30"
+    );
+    const after = (await (await GET()).json()) as ConfigResponse;
+    expect(after.scoring).toEqual({ halfLifeDays: 30, maxAgeDays: 120, minAggregateScore: 0.5 });
+
+    const bad = await POST(
+      new NextRequest("http://localhost/api/config", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "scoring",
+          data: { halfLifeDays: 90, maxAgeDays: 100, minAggregateScore: 1 },
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    expect(bad.status).toBe(400);
+    const err = (await bad.json()) as { error: string };
+    expect(err.error).toContain("max_age_days");
+  });
+
   it("POST adds a package with a competitor name", async () => {
     const res = await POST(
       new NextRequest("http://localhost/api/config", {
