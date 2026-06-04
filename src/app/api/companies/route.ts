@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
       score: ownScore,
       competitorScore,
       segment: deriveSegment(ownScore, competitorScore),
+      lastOwnEngagementAt: own?.lastEventDate ?? null,
+      lastCompetitorEngagementAt: competitor?.lastEventDate ?? null,
       userCount: own?.userCount || 0,
       starCount: own?.starCount || 0,
       forkCount: own?.forkCount || 0,

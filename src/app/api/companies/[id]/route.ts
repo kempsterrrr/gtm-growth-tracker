@@ -177,6 +177,8 @@ export async function GET(
     score: ownScore,
     competitorScore,
     segment: deriveSegment(ownScore, competitorScore),
+    lastOwnEngagementAt: latestScore?.lastEventDate ?? null,
+    lastCompetitorEngagementAt: latestCompetitorScore?.lastEventDate ?? null,
     userCount: latestScore?.userCount || 0,
     starCount: latestScore?.starCount || 0,
     forkCount: latestScore?.forkCount || 0,

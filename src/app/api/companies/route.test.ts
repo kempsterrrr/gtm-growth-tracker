@@ -23,19 +23,19 @@ const addCompany = (name: string) => {
   return (sqlite.prepare("SELECT id FROM companies WHERE name = ?").get(name) as { id: number }).id;
 };
 const today = todayIso();
-const aggregate = (companyId: number, scope: string, score: number) =>
+const aggregate = (companyId: number, scope: string, score: number, lastEvent: string | null = null) =>
   sqlite
     .prepare(
-      "INSERT INTO company_scores (company_id, repo_id, scope, date, score, user_count, star_count, fork_count, issue_count, pr_count, commit_count) VALUES (?, NULL, ?, ?, ?, 2, 1, 0, 1, 0, 0)"
+      "INSERT INTO company_scores (company_id, repo_id, scope, date, score, user_count, star_count, fork_count, issue_count, pr_count, commit_count, last_event_date) VALUES (?, NULL, ?, ?, ?, 2, 1, 0, 1, 0, 0, ?)"
     )
-    .run(companyId, scope, today, score);
+    .run(companyId, scope, today, score, lastEvent);
 
 const engagedCo = addCompany("engaged-co");
 aggregate(engagedCo, "own", 30);
 
 const battlegroundCo = addCompany("battleground-co");
-aggregate(battlegroundCo, "own", 20);
-aggregate(battlegroundCo, "competitor", 15);
+aggregate(battlegroundCo, "own", 20, "2026-06-01");
+aggregate(battlegroundCo, "competitor", 15, "2026-05-20");
 
 const prospectCo = addCompany("prospect-co");
 aggregate(prospectCo, "competitor", 25);
@@ -58,7 +58,10 @@ describe("GET /api/companies (seeded temp DB)", () => {
       score: 20,
       competitorScore: 15,
       segment: "battleground",
+      lastOwnEngagementAt: "2026-06-01",
+      lastCompetitorEngagementAt: "2026-05-20",
     });
+    expect(byName["prospect-co"].lastOwnEngagementAt).toBeNull();
     expect(byName["prospect-co"]).toMatchObject({
       score: 0,
       competitorScore: 25,
@@ -77,6 +80,8 @@ describe("GET /api/companies (seeded temp DB)", () => {
         "score",
         "competitorScore",
         "segment",
+        "lastOwnEngagementAt",
+        "lastCompetitorEngagementAt",
         "userCount",
         "starCount",
         "forkCount",
