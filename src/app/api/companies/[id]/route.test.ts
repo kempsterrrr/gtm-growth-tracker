@@ -94,6 +94,31 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
     expect(res.status).toBe(404);
   });
 
+  it("splits primary users from affiliations, each with its deciding signal", async () => {
+    sqlite.prepare("INSERT INTO github_users (login, name) VALUES ('org-tourist', 'Org Tourist')").run();
+    const tourist = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='org-tourist'").get() as { id: number }
+    ).id;
+    sqlite
+      .prepare(
+        "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'org_membership', 0)"
+      )
+      .run(tourist, companyId);
+
+    const res = await request(companyId);
+    const body = (await res.json()) as CompanyDetail;
+    expect(body.users.some((u) => u.login === "org-tourist")).toBe(false);
+    expect(body.affiliated).toEqual([
+      {
+        id: tourist,
+        login: "org-tourist",
+        name: "Org Tourist",
+        avatarUrl: null,
+        source: "org_membership",
+      },
+    ]);
+  });
+
   it("carries the competitor-employee tag on listed users", async () => {
     sqlite
       .prepare(
@@ -105,7 +130,7 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
     ).id;
     sqlite
       .prepare(
-        "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')"
+        "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)"
       )
       .run(insider, companyId);
 
