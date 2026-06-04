@@ -50,6 +50,13 @@
       "when": 1780531211950,
       "tag": "0006_last-event-date",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1780534742340,
+      "tag": "0007_primary-company-flag",
+      "breakpoints": true
     }
   ]
 }

@@ -125,12 +125,14 @@ export async function GET(
     (a, b) => b.score - a.score
   );
 
-  // Users linked to this company
-  const userLinks = db
+  // Users linked to this company — primary links are the "works here" list;
+  // the rest are visible-but-non-scoring affiliations (PRD #42).
+  const allLinks = db
     .select({
       userId: githubUserCompanies.userId,
       source: githubUserCompanies.source,
       confidence: githubUserCompanies.confidence,
+      isPrimary: githubUserCompanies.isPrimary,
       login: githubUsers.login,
       name: githubUsers.name,
       avatarUrl: githubUsers.avatarUrl,
@@ -142,8 +144,18 @@ export async function GET(
     .innerJoin(githubUsers, sql`${githubUserCompanies.userId} = ${githubUsers.id}`)
     .where(sql`${githubUserCompanies.companyId} = ${companyId}`)
     .all();
+  const userLinks = allLinks.filter((u) => u.isPrimary === 1);
+  const affiliated = allLinks
+    .filter((u) => u.isPrimary !== 1)
+    .map((u) => ({
+      id: u.userId,
+      login: u.login,
+      name: u.name,
+      avatarUrl: u.avatarUrl,
+      source: u.source,
+    }));
 
-  // For each user, get their engagement types
+  // For each primary user, get their engagement types
   const users = userLinks.map((u) => {
     const events = db
       .select({
@@ -187,6 +199,7 @@ export async function GET(
     commitCount: latestScore?.commitCount || 0,
     scoreHistory,
     users,
+    affiliated,
     competitorAttribution,
   };
   return NextResponse.json(payload);

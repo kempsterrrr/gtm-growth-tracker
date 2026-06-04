@@ -102,9 +102,12 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
   let scored = 0;
 
   for (const company of allCompanies) {
-    // Get all users linked to this company
+    // Users whose PRIMARY company this is — one human, one employer, counted
+    // once (PRD #42). Secondary affiliations contribute nothing.
     const userLinks = db.select().from(githubUserCompanies)
-      .where(sql`${githubUserCompanies.companyId} = ${company.id}`)
+      .where(
+        sql`${githubUserCompanies.companyId} = ${company.id} AND ${githubUserCompanies.isPrimary} = 1`
+      )
       .all();
 
     // Depends-on-competitor signals (issue #22): the strongest prospect

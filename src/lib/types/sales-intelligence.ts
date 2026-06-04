@@ -51,9 +51,22 @@ export interface CompanySummary {
   scoreTrend: number; // change vs 7 days ago (own score)
 }
 
+/** A non-primary user-company link (PRD #42): visible context, zero score
+ *  contribution. The source is the signal that created the link. */
+export interface AffiliatedUser {
+  id: number;
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  source: CompanySource;
+}
+
 // The detail route does not compute scoreTrend — the contract matches reality
 export interface CompanyDetail extends Omit<CompanySummary, "scoreTrend"> {
+  /** Users whose PRIMARY company this is — the "works here" list. */
   users: CompanyUser[];
+  /** Non-primary links, collapsed in the UI as "Also affiliated". */
+  affiliated: AffiliatedUser[];
   scoreHistory: Array<{ date: string; score: number }>;
   /** Which competitor repos/packages drove competitorScore (latest per entity). */
   competitorAttribution: CompetitorAttributionRow[];

@@ -179,6 +179,26 @@ export default function CompanyDetailPage() {
           </div>
         )}
 
+        {/* Also affiliated — non-primary links: context, not headcount */}
+        {company.affiliated && company.affiliated.length > 0 && (
+          <details className="border rounded-lg px-4 py-3 text-sm text-muted-foreground">
+            <summary className="cursor-pointer font-medium">
+              Also affiliated ({company.affiliated.length}) — linked but employed elsewhere
+            </summary>
+            <div className="mt-2 space-y-1">
+              {company.affiliated.map((a) => (
+                <div key={a.id} className="flex items-center gap-2">
+                  <span>{a.login}</span>
+                  {a.name && <span className="text-xs">({a.name})</span>}
+                  <Badge variant="outline" className="text-xs">
+                    {a.source.replace("_", " ")}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
         {/* Users table */}
         {company.users && company.users.length > 0 && (
           <div className="border rounded-lg">

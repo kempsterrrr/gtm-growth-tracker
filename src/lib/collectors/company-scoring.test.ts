@@ -39,12 +39,12 @@ const companyId = (
   sqlite.prepare("SELECT id FROM companies WHERE name='Globex'").get() as { id: number }
 ).id;
 run(
-  "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+  "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
   u1,
   companyId
 );
 run(
-  "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+  "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
   u2,
   companyId
 );
@@ -140,7 +140,7 @@ describe("scoreCompanies with competitor attribution", () => {
     run("INSERT INTO github_users (login, competitor_employee, competitor_employee_source) VALUES ('u3', 'Acme', 'commit_activity')");
     const u3 = (sqlite.prepare("SELECT id FROM github_users WHERE login='u3'").get() as { id: number }).id;
     run(
-      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
       u3,
       companyId
     );
@@ -174,7 +174,7 @@ describe("scoreCompanies with competitor attribution", () => {
       sqlite.prepare("SELECT id FROM github_users WHERE login='u4'").get() as { id: number }
     ).id;
     run(
-      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
       u4,
       recencio
     );
@@ -240,7 +240,7 @@ describe("scoreCompanies with competitor attribution", () => {
       sqlite.prepare("SELECT id FROM github_users WHERE login='u5'").get() as { id: number }
     ).id;
     run(
-      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
       u5,
       ancient
     );
@@ -258,6 +258,41 @@ describe("scoreCompanies with competitor attribution", () => {
     expect(rows).toEqual([]); // 400d-old issue contributes nothing; no breadth; no row
   });
 
+  it("counts a user only at their primary company (PRD #42)", async () => {
+    run("INSERT INTO companies (name, domain) VALUES ('PrimaryCo', 'primaryco.io')");
+    run("INSERT INTO companies (name, domain) VALUES ('OrgNoiseCo', 'orgnoise.io')");
+    const primaryCo = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='PrimaryCo'").get() as { id: number }
+    ).id;
+    const orgNoiseCo = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='OrgNoiseCo'").get() as { id: number }
+    ).id;
+    run("INSERT INTO github_users (login) VALUES ('shared-dev')");
+    const sharedDev = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='shared-dev'").get() as { id: number }
+    ).id;
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
+      sharedDev,
+      primaryCo
+    );
+    run(
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'org_membership', 0)",
+      sharedDev,
+      orgNoiseCo
+    );
+    event(ownRepoId, sharedDev, "issue", "issue-shared");
+
+    await scoreCompanies();
+    const aggFor = (companyId: number) =>
+      sqlite
+        .prepare("SELECT scope FROM company_scores WHERE company_id = ? AND repo_id IS NULL")
+        .all(companyId) as Array<{ scope: string }>;
+
+    expect(aggFor(primaryCo).map((r) => r.scope)).toEqual(["own"]); // counted once, here
+    expect(aggFor(orgNoiseCo)).toEqual([]); // the org link contributes nothing
+  });
+
   it("never writes a competitor aggregate for the competitor's own company", async () => {
     // A company named after the tracked competitor, with real engagement on
     // the competitor repo — it must not rank as its own prospect.
@@ -270,7 +305,7 @@ describe("scoreCompanies with competitor attribution", () => {
       sqlite.prepare("SELECT id FROM github_users WHERE login='acme-fan'").get() as { id: number }
     ).id;
     run(
-      "INSERT INTO github_user_companies (user_id, company_id, source) VALUES (?, ?, 'email_domain')",
+      "INSERT INTO github_user_companies (user_id, company_id, source, is_primary) VALUES (?, ?, 'email_domain', 1)",
       fan,
       acmeId
     );
