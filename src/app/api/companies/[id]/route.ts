@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db/client";
 import type { CompanyDetail } from "@/lib/types/api";
 import { entityEngagementsFor } from "@/lib/user-engagements";
 import {
-  companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents, trackedRepos,
+  companies, companyScores, githubUserCompanies, githubUsers, trackedRepos,
   companyCompetitorSignals, trackedPackages,
 } from "@/lib/db/schema";
 import { DEPENDS_ON_WEIGHT, MAX_EVENTS_PER_TYPE } from "@/lib/types/scoring";
