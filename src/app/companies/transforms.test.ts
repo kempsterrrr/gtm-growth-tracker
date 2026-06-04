@@ -3,6 +3,7 @@ import {
   filterCompanies,
   sortCompanies,
   filterByActivity,
+  filterByEntity,
   latestActivity,
   formatRelativeAge,
   formatEngagementBreakdown,
@@ -22,6 +23,7 @@ const company = (over: Partial<CompanySummary>): CompanySummary => ({
   segment: "engaged",
   lastOwnEngagementAt: null,
   lastCompetitorEngagementAt: null,
+  activeEntities: [],
   userCount: 0,
   starCount: 0,
   forkCount: 0,
@@ -168,5 +170,37 @@ describe("sortCompanies by lastActive", () => {
     expect(sortCompanies(list, { key: "lastActive", dir: "asc" }).map((c) => c.id)).toEqual([
       1, 3, 2,
     ]);
+  });
+});
+
+describe("filterByEntity", () => {
+  const list = [
+    company({ id: 1, activeEntities: ["us/own-repo", "pinata-js"] }),
+    company({ id: 2, activeEntities: ["pinata/pinata-sdk"] }),
+    company({ id: 3 }),
+  ];
+  it("null passes everything; a label narrows to companies active on it", () => {
+    expect(filterByEntity(list, null).map((c) => c.id)).toEqual([1, 2, 3]);
+    expect(filterByEntity(list, "pinata-js").map((c) => c.id)).toEqual([1]);
+    expect(filterByEntity(list, "pinata/pinata-sdk").map((c) => c.id)).toEqual([2]);
+  });
+});
+
+describe("sortCompanies by name, users, trend", () => {
+  const list = [
+    company({ id: 1, name: "zeta", userCount: 1, scoreTrend: -2 }),
+    company({ id: 2, name: "Alpha", userCount: 5, scoreTrend: 3 }),
+    company({ id: 3, name: "mid", userCount: 3, scoreTrend: 0 }),
+  ];
+  it("name sorts case-insensitively", () => {
+    expect(sortCompanies(list, { key: "name", dir: "asc" }).map((c) => c.name)).toEqual([
+      "Alpha",
+      "mid",
+      "zeta",
+    ]);
+  });
+  it("users and trend sort numerically", () => {
+    expect(sortCompanies(list, { key: "users", dir: "desc" }).map((c) => c.id)).toEqual([2, 3, 1]);
+    expect(sortCompanies(list, { key: "trend", dir: "asc" }).map((c) => c.id)).toEqual([1, 3, 2]);
   });
 });

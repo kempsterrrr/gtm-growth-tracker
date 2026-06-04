@@ -36,6 +36,33 @@ aggregate(engagedCo, "own", 30);
 const battlegroundCo = addCompany("battleground-co");
 aggregate(battlegroundCo, "own", 20, "2026-06-01");
 aggregate(battlegroundCo, "competitor", 15, "2026-05-20");
+// Entity-level activity: a per-repo score row + a depends-on signal.
+sqlite
+  .prepare(
+    "INSERT INTO tracked_repos (owner, name, competitor) VALUES ('pinata', 'pinata-sdk', 'Pinata')"
+  )
+  .run();
+const rivalRepo = (
+  sqlite.prepare("SELECT id FROM tracked_repos WHERE name='pinata-sdk'").get() as { id: number }
+).id;
+sqlite
+  .prepare(
+    "INSERT INTO company_scores (company_id, repo_id, scope, date, score, user_count) VALUES (?, ?, 'competitor', ?, 15, 2)"
+  )
+  .run(battlegroundCo, rivalRepo, today);
+sqlite
+  .prepare(
+    "INSERT INTO tracked_packages (registry, name, competitor) VALUES ('npm', 'pinata-js', 'Pinata')"
+  )
+  .run();
+const rivalPkg = (
+  sqlite.prepare("SELECT id FROM tracked_packages WHERE name='pinata-js'").get() as { id: number }
+).id;
+sqlite
+  .prepare(
+    "INSERT INTO company_competitor_signals (company_id, package_id, signal_type, dependent_name, first_seen) VALUES (?, ?, 'depends_on', 'bg-app', ?)"
+  )
+  .run(battlegroundCo, rivalPkg, today);
 
 const prospectCo = addCompany("prospect-co");
 aggregate(prospectCo, "competitor", 25);
@@ -60,8 +87,10 @@ describe("GET /api/companies (seeded temp DB)", () => {
       segment: "battleground",
       lastOwnEngagementAt: "2026-06-01",
       lastCompetitorEngagementAt: "2026-05-20",
+      activeEntities: ["pinata/pinata-sdk", "pinata-js"],
     });
     expect(byName["prospect-co"].lastOwnEngagementAt).toBeNull();
+    expect(byName["engaged-co"].activeEntities).toEqual([]);
     expect(byName["prospect-co"]).toMatchObject({
       score: 0,
       competitorScore: 25,
@@ -82,6 +111,7 @@ describe("GET /api/companies (seeded temp DB)", () => {
         "segment",
         "lastOwnEngagementAt",
         "lastCompetitorEngagementAt",
+        "activeEntities",
         "userCount",
         "starCount",
         "forkCount",

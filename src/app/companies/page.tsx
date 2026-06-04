@@ -11,6 +11,7 @@ import {
   filterCompanies,
   sortCompanies,
   filterByActivity,
+  filterByEntity,
   latestActivity,
   formatRelativeAge,
   type SegmentFilter,
@@ -32,6 +33,7 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [segment, setSegment] = useState<SegmentFilter>("all");
   const [activity, setActivity] = useState<ActivityWindow>("all");
+  const [entity, setEntity] = useState<string | null>(null);
   const [sort, setSort] = useState<SortSpec | null>(null);
 
   useEffect(() => {
@@ -42,9 +44,10 @@ export default function CompaniesPage() {
   }, []);
 
   const visible = sortCompanies(
-    filterByActivity(filterCompanies(companies, segment), activity, todayIso()),
+    filterByEntity(filterByActivity(filterCompanies(companies, segment), activity, todayIso()), entity),
     sort
   );
+  const entityOptions = [...new Set(companies.flatMap((c) => c.activeEntities))].sort();
 
   const toggleSort = (key: SortKey) =>
     setSort((cur) =>
@@ -129,6 +132,18 @@ export default function CompaniesPage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              <select
+                value={entity ?? ""}
+                onChange={(e) => setEntity(e.target.value || null)}
+                className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm"
+              >
+                <option value="">All entities</option>
+                {entityOptions.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
@@ -141,7 +156,11 @@ export default function CompaniesPage() {
                     <thead>
                       <tr className="border-b bg-muted/50">
                         <th className="text-left px-4 py-2 font-medium w-8">#</th>
-                        <th className="text-left px-4 py-2 font-medium">Company</th>
+                        <th className="text-left px-4 py-2 font-medium">
+                          <button className="hover:text-foreground" onClick={() => toggleSort("name")}>
+                            Company{sortIndicator("name")}
+                          </button>
+                        </th>
                         <th className="text-left px-4 py-2 font-medium">Domain</th>
                         <th className="text-right px-4 py-2 font-medium">
                           <button
@@ -168,8 +187,16 @@ export default function CompaniesPage() {
                             Last Active{sortIndicator("lastActive")}
                           </button>
                         </th>
-                        <th className="text-right px-4 py-2 font-medium">Trend</th>
-                        <th className="text-right px-4 py-2 font-medium">Users</th>
+                        <th className="text-right px-4 py-2 font-medium">
+                          <button className="hover:text-foreground" onClick={() => toggleSort("trend")}>
+                            Trend{sortIndicator("trend")}
+                          </button>
+                        </th>
+                        <th className="text-right px-4 py-2 font-medium">
+                          <button className="hover:text-foreground" onClick={() => toggleSort("users")}>
+                            Users{sortIndicator("users")}
+                          </button>
+                        </th>
                         <th className="text-left px-4 py-2 font-medium w-48">Breakdown</th>
                       </tr>
                     </thead>
