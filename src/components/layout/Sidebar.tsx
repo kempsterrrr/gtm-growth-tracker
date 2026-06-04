@@ -15,6 +15,7 @@ import {
   Boxes,
   Building2,
   Bell,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/pypi", label: "PyPI", icon: Boxes },
   { href: "/dependencies", label: "Dependencies", icon: GitFork },
   { href: "/companies", label: "Companies", icon: Building2 },
+  { href: "/people", label: "People", icon: Users },
   { href: "/events", label: "Events", icon: Calendar },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/settings", label: "Settings", icon: Settings },
