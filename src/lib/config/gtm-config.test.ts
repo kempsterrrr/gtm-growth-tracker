@@ -8,9 +8,8 @@ const tmp = mkdtempSync(path.join(tmpdir(), "gtm-config-test-"));
 process.env.DATABASE_PATH = path.join(tmp, "test.db");
 
 const { runMigrations } = await import("../db/migrate");
-const { readConfig, addRepo, addPackage, syncToDatabase, ConfigError } = await import(
-  "./gtm-config"
-);
+const { readConfig, addRepo, addPackage, syncToDatabase, updateScoring, resolveScoringKnobs, ConfigError } =
+  await import("./gtm-config");
 
 runMigrations();
 const sqlite = new Database(process.env.DATABASE_PATH!);
@@ -223,6 +222,42 @@ competitors:
     );
     expect(() => readConfig(p)).toThrow(ConfigError);
     expect(() => readConfig(p)).toThrow(/Ghost/);
+  });
+
+  it("rejects a scoring block violating field bounds or the cross-field rule, naming it", () => {
+    const write = (scoring: string) => {
+      const p = path.join(tmp, `scoring-bad-${n++}.yaml`);
+      writeFileSync(p, `github:\n  repos: []\npackages:\n  npm: []\n  pypi: []\nscoring:\n${scoring}`);
+      return p;
+    };
+    expect(() => readConfig(write("  half_life_days: 5\n"))).toThrow(/half_life_days/);
+    expect(() => readConfig(write("  min_aggregate_score: 9\n"))).toThrow(/min_aggregate_score/);
+    expect(() =>
+      readConfig(write("  half_life_days: 90\n  max_age_days: 100\n"))
+    ).toThrow(/max_age_days/);
+  });
+
+  it("round-trips a scoring update YAML-first and fills field defaults", () => {
+    const p = freshConfig();
+    updateScoring({ half_life_days: 30, max_age_days: 120 }, p);
+    const config = readConfig(p);
+    expect(config.scoring).toEqual({
+      half_life_days: 30,
+      max_age_days: 120,
+      min_aggregate_score: 1,
+    });
+    expect(() => updateScoring({ half_life_days: 90, max_age_days: 100 }, p)).toThrow(ConfigError);
+  });
+
+  it("resolves knobs from the block, with decay-module defaults when absent", () => {
+    expect(resolveScoringKnobs(undefined)).toEqual({
+      halfLifeDays: 90,
+      maxAgeDays: 360,
+      minAggregateScore: 1,
+    });
+    expect(
+      resolveScoringKnobs({ half_life_days: 30, max_age_days: 120, min_aggregate_score: 0.5 })
+    ).toEqual({ halfLifeDays: 30, maxAgeDays: 120, minAggregateScore: 0.5 });
   });
 
   it("accepts competitor entries with no competitors block", () => {
