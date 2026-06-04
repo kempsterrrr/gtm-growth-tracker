@@ -69,7 +69,16 @@ aggregate rows (`repo_id IS NULL`) are written one-per-scope via
 delete-then-insert (the NULL repo_id never hits the unique index, so upserts
 would duplicate). The weight table is selected per repo
 (`COMPETITOR_ENGAGEMENT_WEIGHTS`: issues high, forks medium, stars low,
-commits/PRs 0 — supply signals identify employees, not prospects). Segments
+commits/PRs 0 — supply signals identify employees, not prospects). Recency (PRD #34): engagement
+weights decay exponentially via `src/lib/decay.ts` (half-life semantics; an
+aggregate under the floor writes no row, so segments drop when interest
+dies; depends-on signals never decay — a dependency is current state).
+Score rows carry `last_event_date` (newest event aggregated, per scope),
+surfaced as the Companies "Last Active" column/filter. The three knobs live
+in the optional `scoring:` config block (cross-field-validated, edited from
+the Settings Scoring card, resolved with code defaults via
+`resolveScoringKnobs`); explicit knob args > config block > defaults, and
+changes apply on the next collection run. Segments
 (engaged / battleground / prospect) are derived at query time via
 `src/lib/segments.ts`, never stored. Aggregate reads (companies API, alert
 rules) must pin a scope — own-engagement semantics never blend with
