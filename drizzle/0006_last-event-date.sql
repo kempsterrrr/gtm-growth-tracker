@@ -1,0 +1,1 @@
+ALTER TABLE `company_scores` ADD `last_event_date` text;

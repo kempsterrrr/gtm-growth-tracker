@@ -37,6 +37,11 @@ export interface CompanySummary {
   competitorScore: number;
   /** Derived at query time from the two aggregates (PRD #17 matrix). */
   segment: CompanySegment;
+  /** Newest engagement event on our repos / on competitor repos (PRD #34).
+   *  Null when that side has no live (undecayed) signal — e.g. depends-on-only
+   *  prospects, whose dependency is the liveness signal. */
+  lastOwnEngagementAt: string | null;
+  lastCompetitorEngagementAt: string | null;
   userCount: number;
   starCount: number;
   forkCount: number;

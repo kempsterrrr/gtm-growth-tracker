@@ -10,10 +10,15 @@ import { Building2, TrendingUp, Users, Star } from "lucide-react";
 import {
   filterCompanies,
   sortCompanies,
+  filterByActivity,
+  latestActivity,
+  formatRelativeAge,
   type SegmentFilter,
   type SortSpec,
   type SortKey,
+  type ActivityWindow,
 } from "./transforms";
+import { todayIso } from "@/lib/dates";
 import type { CompanySummary, CompanySegment } from "@/lib/types/sales-intelligence";
 
 const SEGMENT_BADGE: Record<CompanySegment, "default" | "secondary" | "outline"> = {
@@ -26,6 +31,7 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [segment, setSegment] = useState<SegmentFilter>("all");
+  const [activity, setActivity] = useState<ActivityWindow>("all");
   const [sort, setSort] = useState<SortSpec | null>(null);
 
   useEffect(() => {
@@ -35,7 +41,10 @@ export default function CompaniesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const visible = sortCompanies(filterCompanies(companies, segment), sort);
+  const visible = sortCompanies(
+    filterByActivity(filterCompanies(companies, segment), activity, todayIso()),
+    sort
+  );
 
   const toggleSort = (key: SortKey) =>
     setSort((cur) =>
@@ -90,22 +99,37 @@ export default function CompaniesPage() {
 
         {!loading && companies.length > 0 && (
           <div className="space-y-3">
-            <Tabs defaultValue="all">
-              <TabsList>
-                <TabsTrigger value="all" onClick={() => setSegment("all")}>
-                  All
-                </TabsTrigger>
-                <TabsTrigger value="engaged" onClick={() => setSegment("engaged")}>
-                  Engaged
-                </TabsTrigger>
-                <TabsTrigger value="battleground" onClick={() => setSegment("battleground")}>
-                  Battleground
-                </TabsTrigger>
-                <TabsTrigger value="prospect" onClick={() => setSegment("prospect")}>
-                  Net-new Prospect
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Tabs defaultValue="all">
+                <TabsList>
+                  <TabsTrigger value="all" onClick={() => setSegment("all")}>
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger value="engaged" onClick={() => setSegment("engaged")}>
+                    Engaged
+                  </TabsTrigger>
+                  <TabsTrigger value="battleground" onClick={() => setSegment("battleground")}>
+                    Battleground
+                  </TabsTrigger>
+                  <TabsTrigger value="prospect" onClick={() => setSegment("prospect")}>
+                    Net-new Prospect
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Tabs defaultValue="all">
+                <TabsList>
+                  <TabsTrigger value="all" onClick={() => setActivity("all")}>
+                    Any time
+                  </TabsTrigger>
+                  <TabsTrigger value="90d" onClick={() => setActivity("90d")}>
+                    Active 90d
+                  </TabsTrigger>
+                  <TabsTrigger value="30d" onClick={() => setActivity("30d")}>
+                    Active 30d
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
             {visible.length === 0 ? (
               <p className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
                 No {segment === "all" ? "" : segment + " "}companies yet.
@@ -136,6 +160,14 @@ export default function CompaniesPage() {
                           </button>
                         </th>
                         <th className="text-left px-4 py-2 font-medium">Segment</th>
+                        <th className="text-right px-4 py-2 font-medium">
+                          <button
+                            className="hover:text-foreground"
+                            onClick={() => toggleSort("lastActive")}
+                          >
+                            Last Active{sortIndicator("lastActive")}
+                          </button>
+                        </th>
                         <th className="text-right px-4 py-2 font-medium">Trend</th>
                         <th className="text-right px-4 py-2 font-medium">Users</th>
                         <th className="text-left px-4 py-2 font-medium w-48">Breakdown</th>
@@ -170,6 +202,11 @@ export default function CompaniesPage() {
                                 ? "net-new prospect"
                                 : company.segment}
                             </Badge>
+                          </td>
+                          <td className="px-4 py-2 text-right text-muted-foreground">
+                            {latestActivity(company)
+                              ? formatRelativeAge(latestActivity(company)!, todayIso())
+                              : "—"}
                           </td>
                           <td className="px-4 py-2 text-right">
                             {company.scoreTrend > 0 ? (

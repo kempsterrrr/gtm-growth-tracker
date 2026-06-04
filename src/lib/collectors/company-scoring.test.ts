@@ -209,6 +209,27 @@ describe("scoreCompanies with competitor attribution", () => {
     expect(agg("own")?.score).toBe(2.25); // 0.25 decayed star + 2 breadth
   });
 
+  it("stamps each aggregate with the newest event date it kept, per scope", async () => {
+    await scoreCompanies();
+    const stamp = (companyId: number, scope: string) =>
+      (
+        sqlite
+          .prepare(
+            "SELECT last_event_date AS d FROM company_scores WHERE company_id = ? AND repo_id IS NULL AND scope = ? AND date = ?"
+          )
+          .get(companyId, scope, todayIso()) as { d: string | null } | undefined
+      )?.d;
+
+    const recencio = (
+      sqlite.prepare("SELECT id FROM companies WHERE name='Recencio'").get() as { id: number }
+    ).id;
+    expect(stamp(recencio, "competitor")).toBe(daysAgoIso(90)); // its only competitor event
+    expect(stamp(recencio, "own")).toBe(daysAgoIso(180));
+    // Globex's events are dateless → they stamp from their collection date (today)
+    expect(stamp(companyId, "own")).toBe(todayIso());
+    expect(stamp(companyId, "competitor")).toBe(todayIso());
+  });
+
   it("skips events past the max age entirely — fully-cooled companies carry no aggregate", async () => {
     run("INSERT INTO companies (name, domain) VALUES ('Ancient Ltd', 'ancient.io')");
     const ancient = (

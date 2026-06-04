@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   filterCompanies,
   sortCompanies,
+  filterByActivity,
+  latestActivity,
+  formatRelativeAge,
   formatEngagementBreakdown,
   formatDependentCount,
 } from "./transforms";
@@ -17,6 +20,8 @@ const company = (over: Partial<CompanySummary>): CompanySummary => ({
   score: 0,
   competitorScore: 0,
   segment: "engaged",
+  lastOwnEngagementAt: null,
+  lastCompetitorEngagementAt: null,
   userCount: 0,
   starCount: 0,
   forkCount: 0,
@@ -101,5 +106,67 @@ describe("formatDependentCount", () => {
   it("handles singular and plural", () => {
     expect(formatDependentCount(1)).toBe("1 dependent repo");
     expect(formatDependentCount(3)).toBe("3 dependent repos");
+  });
+});
+
+describe("latestActivity", () => {
+  it("returns the fresher of the two sides, or null when both are missing", () => {
+    expect(
+      latestActivity(
+        company({ lastOwnEngagementAt: "2026-06-01", lastCompetitorEngagementAt: "2026-05-20" })
+      )
+    ).toBe("2026-06-01");
+    expect(
+      latestActivity(company({ lastCompetitorEngagementAt: "2026-05-20" }))
+    ).toBe("2026-05-20");
+    expect(latestActivity(company({}))).toBeNull();
+  });
+});
+
+describe("filterByActivity (windows anchored on a given today)", () => {
+  const TODAY = "2026-06-04";
+  const list = [
+    company({ id: 1, lastOwnEngagementAt: "2026-06-01" }), // 3d
+    company({ id: 2, lastCompetitorEngagementAt: "2026-04-01" }), // 64d
+    company({ id: 3, lastOwnEngagementAt: "2025-09-01" }), // ~9mo
+    company({ id: 4 }), // no timestamps (deps-only)
+  ];
+  it("'all' passes everything", () => {
+    expect(filterByActivity(list, "all", TODAY).map((c) => c.id)).toEqual([1, 2, 3, 4]);
+  });
+  it("'90d' keeps companies active in the window", () => {
+    expect(filterByActivity(list, "90d", TODAY).map((c) => c.id)).toEqual([1, 2]);
+  });
+  it("'30d' narrows further and drops timestamp-less companies", () => {
+    expect(filterByActivity(list, "30d", TODAY).map((c) => c.id)).toEqual([1]);
+  });
+});
+
+describe("formatRelativeAge", () => {
+  const TODAY = "2026-06-04";
+  it("phrases ages human-first", () => {
+    expect(formatRelativeAge("2026-06-04", TODAY)).toBe("today");
+    expect(formatRelativeAge("2026-06-03", TODAY)).toBe("1d ago");
+    expect(formatRelativeAge("2026-05-20", TODAY)).toBe("15d ago");
+    expect(formatRelativeAge("2026-03-04", TODAY)).toBe("3mo ago");
+    expect(formatRelativeAge("2024-06-04", TODAY)).toBe("2y ago");
+  });
+});
+
+describe("sortCompanies by lastActive", () => {
+  const list = [
+    company({ id: 1, lastOwnEngagementAt: "2026-05-01" }),
+    company({ id: 2 }), // null — always last
+    company({ id: 3, lastCompetitorEngagementAt: "2026-06-01" }),
+  ];
+  it("desc puts freshest first, nulls last", () => {
+    expect(sortCompanies(list, { key: "lastActive", dir: "desc" }).map((c) => c.id)).toEqual([
+      3, 1, 2,
+    ]);
+  });
+  it("asc puts oldest first, nulls still last", () => {
+    expect(sortCompanies(list, { key: "lastActive", dir: "asc" }).map((c) => c.id)).toEqual([
+      1, 3, 2,
+    ]);
   });
 });
