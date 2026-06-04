@@ -84,7 +84,15 @@ changes apply on the next collection run. Segments
 rules) must pin a scope — own-engagement semantics never blend with
 competitor engagement. The Companies UI derives its filter/sort/phrasing in
 `src/app/companies/transforms.ts` (exported, unit-tested); the detail API's
-`competitorAttribution` exposes the latest per-repo competitor score rows
+`competitorAttribution` exposes the latest per-repo competitor score rows.
+People-first layer (PRD #42): every user carries exactly one primary
+company link (`is_primary`, picked by confidence — email > profile > org,
+ties to first-discovered — recomputed each resolution run; the link upsert
+lifts source WITH confidence); scoring counts users at their primary only;
+per-user engagement is broken down per entity via
+`src/lib/user-engagements.ts` (shared by company detail and `/api/people`);
+the People page (`src/app/people/`) lists every engaged human once with its
+own tested transforms
 plus depends-on rows from `company_competitor_signals` (one row per
 company × competitor package × dependent; written by
 `resolve-competitor-dependents`, scored at `DEPENDS_ON_WEIGHT`, capped per
