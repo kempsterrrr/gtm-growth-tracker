@@ -325,6 +325,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Recency scoring knobs */}
+        <ScoringCard />
+
         {/* Slack Integration */}
         <SlackConfigCard />
 
@@ -364,6 +367,106 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function ScoringCard() {
+  const [halfLife, setHalfLife] = useState("90");
+  const [maxAge, setMaxAge] = useState("360");
+  const [floor, setFloor] = useState("1");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data: { scoring: { halfLifeDays: number; maxAgeDays: number; minAggregateScore: number } }) => {
+        setHalfLife(String(data.scoring.halfLifeDays));
+        setMaxAge(String(data.scoring.maxAgeDays));
+        setFloor(String(data.scoring.minAggregateScore));
+      });
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "scoring",
+        data: {
+          halfLifeDays: Number(halfLife),
+          maxAgeDays: Number(maxAge),
+          minAggregateScore: Number(floor),
+        },
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || `Request failed (${res.status})`);
+      return;
+    }
+    setSaved(true);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Engagement Scoring</CardTitle>
+        <CardDescription>
+          Recency decay: an event&apos;s weight halves every half-life. Changes apply on the next
+          collection run — use Run Collection Now below to apply immediately.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={save} className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm font-medium block mb-1">Half-life (days)</label>
+              <input
+                type="number"
+                min={7}
+                value={halfLife}
+                onChange={(e) => setHalfLife(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Ignore events after (days)</label>
+              <input
+                type="number"
+                value={maxAge}
+                onChange={(e) => setMaxAge(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Signal floor (points)</label>
+              <input
+                type="number"
+                step="0.1"
+                min={0}
+                max={5}
+                value={floor}
+                onChange={(e) => setFloor(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
+          {saved && <p className="text-sm text-muted-foreground">Saved — applies on the next collection run.</p>}
+          <Button type="submit" size="sm">
+            Save
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
