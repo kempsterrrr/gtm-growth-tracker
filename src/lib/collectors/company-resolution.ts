@@ -45,10 +45,34 @@ function linkUserToCompany(
     .onConflictDoUpdate({
       target: [githubUserCompanies.userId, githubUserCompanies.companyId],
       set: {
+        // When stronger evidence arrives, lift the confidence AND the source
+        // — the source is the "deciding signal" shown in the UI (PRD #42).
+        // Both SET expressions see the pre-update row, so the comparison and
+        // the MAX read the same old confidence.
+        source: sql`CASE WHEN ${confidence} > ${githubUserCompanies.confidence} THEN ${source} ELSE ${githubUserCompanies.source} END`,
         confidence: sql`MAX(${githubUserCompanies.confidence}, ${confidence})`,
       },
     })
     .run();
+}
+
+/** Exactly one primary link per user: highest confidence wins, ties go to
+ *  the first-discovered link. Set-wise and idempotent — links are never
+ *  deleted, and a stronger signal arriving later upgrades the primary on the
+ *  next run (PRD #42). */
+function recomputePrimaryCompanies(db: ReturnType<typeof getDb>) {
+  db.run(sql`UPDATE github_user_companies SET is_primary = 0 WHERE is_primary != 0`);
+  db.run(sql`
+    UPDATE github_user_companies SET is_primary = 1
+    WHERE id IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY user_id ORDER BY confidence DESC, id ASC
+        ) AS rn
+        FROM github_user_companies
+      ) WHERE rn = 1
+    )
+  `);
 }
 
 export async function resolveCompanies() {
@@ -130,6 +154,9 @@ export async function resolveCompanies() {
   }
   console.log(`[company-resolution] Org membership: ${orgLinks} links`);
   console.log(`[company-resolution] Total: ${resolved + profileLinks + orgLinks} user-company links`);
+
+  // One human, one employer: pick each user's primary link (PRD #42).
+  recomputePrimaryCompanies(db);
 
   // Employee tagging happens "during/after company resolution" (PRD #17) —
   // it needs the freshly-resolved company links for the domain signal.
