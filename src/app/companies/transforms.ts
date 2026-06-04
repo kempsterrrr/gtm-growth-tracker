@@ -12,11 +12,18 @@ export function filterCompanies(
   return companies.filter((c) => c.segment === segment);
 }
 
-export type SortKey = "score" | "competitorScore" | "lastActive";
+export type SortKey = "name" | "score" | "competitorScore" | "lastActive" | "users" | "trend";
 export interface SortSpec {
   key: SortKey;
   dir: "asc" | "desc";
 }
+
+const NUMERIC_SORT_FIELDS: Record<string, keyof CompanySummary> = {
+  score: "score",
+  competitorScore: "competitorScore",
+  users: "userCount",
+  trend: "scoreTrend",
+};
 
 export function sortCompanies(
   companies: CompanySummary[],
@@ -36,8 +43,25 @@ export function sortCompanies(
       return sign * av.localeCompare(bv);
     });
   }
-  const key = sort.key; // narrowed to the numeric keys; const propagates into the closure
-  return [...companies].sort((a, b) => sign * (a[key] - b[key]));
+  if (sort.key === "name") {
+    return [...companies].sort(
+      (a, b) => sign * a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  }
+  const field = NUMERIC_SORT_FIELDS[sort.key];
+  return [...companies].sort(
+    (a, b) => sign * ((a[field] as number) - (b[field] as number))
+  );
+}
+
+/** Narrow to companies with activity on the given entity label (PRD #42);
+ *  null = all. */
+export function filterByEntity(
+  companies: CompanySummary[],
+  entity: string | null
+): CompanySummary[] {
+  if (!entity) return companies;
+  return companies.filter((c) => c.activeEntities.includes(entity));
 }
 
 /** The fresher of the two per-side timestamps (PRD #34), null when neither
