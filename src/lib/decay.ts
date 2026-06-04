@@ -22,15 +22,20 @@ export function decayMultiplier(
   return Math.pow(0.5, ageDays / halfLifeDays);
 }
 
-/** Whole-day age of an event as of todayIsoDate, preferring the recorded
- *  event date and falling back to the collection timestamp (we at least know
- *  when we first saw it). Never negative. */
+/** The date an event anchors to for recency purposes: its recorded date,
+ *  falling back to the collection timestamp (we at least know when we first
+ *  saw it). Also the value stamped as last_event_date. */
+export function eventAnchorDate(eventDate: string | null, collectedAt: string): string {
+  return eventDate || toIsoDate(new Date(collectedAt.replace(" ", "T") + "Z"));
+}
+
+/** Whole-day age of an event as of todayIsoDate. Never negative. */
 export function eventAgeDays(
   eventDate: string | null,
   collectedAt: string,
   todayIsoDate: string
 ): number {
-  const anchor = eventDate || toIsoDate(new Date(collectedAt.replace(" ", "T") + "Z"));
+  const anchor = eventAnchorDate(eventDate, collectedAt);
   const ms = new Date(todayIsoDate).getTime() - new Date(anchor).getTime();
   return Math.max(0, Math.round(ms / 86400000));
 }

@@ -362,6 +362,10 @@ export const companyScores = sqliteTable(
       .default("own"),
     date: text("date").notNull(),
     score: real("score").notNull(),
+    /** Newest engagement-event date this row aggregated (decay-kept events
+     *  only; dateless events contribute their collection date). Null on
+     *  rows written before recency shipped. */
+    lastEventDate: text("last_event_date"),
     userCount: integer("user_count").notNull(),
     starCount: integer("star_count").notNull().default(0),
     forkCount: integer("fork_count").notNull().default(0),

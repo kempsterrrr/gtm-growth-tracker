@@ -482,6 +482,22 @@ describe("schema equivalence (upgrade-path gate)", () => {
     db.close();
   });
 
+  it("the migrations add the last-event-date column", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "last-event.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const col = (
+      db.prepare("PRAGMA table_info(company_scores)").all() as Array<{
+        name: string;
+        notnull: number;
+      }>
+    )
+      .filter((c) => c.name === "last_event_date")
+      .map((c) => ({ name: c.name, notnull: c.notnull }));
+    expect(col).toEqual([{ name: "last_event_date", notnull: 0 }]);
+    db.close();
+  });
+
   it("the migrations widen the alert rule-type check to the competitor rules", () => {
     process.env.DATABASE_PATH = path.join(tmp, "alert-types.db");
     runMigrations();

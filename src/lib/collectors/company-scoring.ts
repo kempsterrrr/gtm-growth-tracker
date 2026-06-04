@@ -13,6 +13,7 @@ import { readConfig } from "../config/gtm-config";
 import {
   decayMultiplier,
   eventAgeDays,
+  eventAnchorDate,
   DECAY_HALF_LIFE_DAYS,
   DECAY_MAX_AGE_DAYS,
   MIN_AGGREGATE_SCORE,
@@ -52,10 +53,12 @@ interface ScopeTotals {
   issues: number;
   prs: number;
   commits: number;
+  /** Newest event anchor date aggregated into this scope (ISO, nullable). */
+  lastEvent: string | null;
 }
 
 const emptyTotals = (): ScopeTotals => ({
-  score: 0, users: 0, stars: 0, forks: 0, issues: 0, prs: 0, commits: 0,
+  score: 0, users: 0, stars: 0, forks: 0, issues: 0, prs: 0, commits: 0, lastEvent: null,
 });
 
 export async function scoreCompanies(knobs: ScoringKnobs = {}) {
@@ -138,6 +141,7 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
       let repoScore = 0;
       let repoUsers = 0;
       let repoStars = 0, repoForks = 0, repoIssues = 0, repoPrs = 0, repoCommits = 0;
+      let repoLastEvent: string | null = null;
 
       for (const userId of userIds) {
         // Competitor employees never contribute to competitor-scope scores.
@@ -172,6 +176,8 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
           for (const e of kept) {
             const age = eventAgeDays(e.eventDate, e.collectedAt, today);
             userScore += weight * decayMultiplier(age, halfLife, maxAge);
+            const anchor = eventAnchorDate(e.eventDate, e.collectedAt);
+            if (!repoLastEvent || anchor > repoLastEvent) repoLastEvent = anchor;
           }
           const capped = kept.length;
 
@@ -197,7 +203,7 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
         db.insert(companyScores)
           .values({
             companyId: company.id, repoId: repo.id, scope, date: today,
-            score: repoScore, userCount: repoUsers,
+            score: repoScore, userCount: repoUsers, lastEventDate: repoLastEvent,
             starCount: repoStars, forkCount: repoForks,
             issueCount: repoIssues, prCount: repoPrs, commitCount: repoCommits,
           })
@@ -206,6 +212,7 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
             set: {
               scope: sql`excluded.scope`,
               score: sql`excluded.score`, userCount: sql`excluded.user_count`,
+              lastEventDate: sql`excluded.last_event_date`,
               starCount: sql`excluded.star_count`, forkCount: sql`excluded.fork_count`,
               issueCount: sql`excluded.issue_count`, prCount: sql`excluded.pr_count`,
               commitCount: sql`excluded.commit_count`,
@@ -219,6 +226,9 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
       t.users = Math.max(t.users, repoUsers);
       t.stars += repoStars; t.forks += repoForks;
       t.issues += repoIssues; t.prs += repoPrs; t.commits += repoCommits;
+      if (repoLastEvent && (!t.lastEvent || repoLastEvent > t.lastEvent)) {
+        t.lastEvent = repoLastEvent;
+      }
     }
 
     for (const s of signalCounts) {
@@ -247,7 +257,7 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
       db.insert(companyScores)
         .values({
           companyId: company.id, repoId: null, scope, date: today,
-          score: t.score, userCount: t.users,
+          score: t.score, userCount: t.users, lastEventDate: t.lastEvent,
           starCount: t.stars, forkCount: t.forks,
           issueCount: t.issues, prCount: t.prs, commitCount: t.commits,
         })
