@@ -141,6 +141,61 @@ describe("GET /api/companies/[id] (seeded temp DB)", () => {
     expect(user?.competitorEmployeeSource).toBe("commit_activity");
   });
 
+  it("breaks each user's engagement down per entity with competitor attribution", async () => {
+    sqlite
+      .prepare(
+        "INSERT INTO tracked_repos (owner, name, display_name) VALUES ('us', 'own-repo', 'Ours')"
+      )
+      .run();
+    const ownRepo = (
+      sqlite.prepare("SELECT id FROM tracked_repos WHERE name='own-repo'").get() as { id: number }
+    ).id;
+    const insider = (
+      sqlite.prepare("SELECT id FROM github_users WHERE login='insider'").get() as { id: number }
+    ).id;
+    const event = (repoId: number, type: string, eventId: string, date: string) =>
+      sqlite
+        .prepare(
+          "INSERT INTO github_engagement_events (repo_id, user_id, event_type, github_event_id, event_date) VALUES (?, ?, ?, ?, ?)"
+        )
+        .run(repoId, insider, type, eventId, date);
+    event(ownRepo, "issue", "i-1", "2026-06-01");
+    event(ownRepo, "issue", "i-2", "2026-06-02");
+    event(ownRepo, "star", "star", "2026-05-01");
+    event(rivalRepoId, "fork", "f-1", "2026-04-01");
+
+    const res = await request(companyId);
+    const body = (await res.json()) as CompanyDetail;
+    const user = body.users.find((u) => u.login === "insider")!;
+    expect(user.engagements).toEqual([
+      {
+        entity: "us/own-repo",
+        displayName: "Ours",
+        competitor: null,
+        starCount: 1,
+        forkCount: 0,
+        issueCount: 2,
+        prCount: 0,
+        commitCount: 0,
+        lastAt: "2026-06-02",
+      },
+      {
+        entity: "pinata/pinata-sdk",
+        displayName: "Pinata SDK",
+        competitor: "Pinata",
+        starCount: 0,
+        forkCount: 1,
+        issueCount: 0,
+        prCount: 0,
+        commitCount: 0,
+        lastAt: "2026-04-01",
+      },
+    ]);
+    // the unscoped generic fields are gone
+    expect("engagementTypes" in user).toBe(false);
+    expect("eventCount" in user).toBe(false);
+  });
+
   it("attributes the competitor score to its sources (repos + package dependents, score desc)", async () => {
     const res = await request(companyId);
     const body = (await res.json()) as CompanyDetail;

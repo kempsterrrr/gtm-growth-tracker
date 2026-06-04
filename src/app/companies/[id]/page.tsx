@@ -6,7 +6,6 @@ import Link from "next/link";
 import { MetricCard } from "@/components/charts/MetricCard";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
 import { CompanyScoreBar } from "@/components/companies/CompanyScoreBar";
-import { EngagementBadges } from "@/components/companies/EngagementBadges";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Globe, MapPin } from "lucide-react";
 import { formatEngagementBreakdown, formatDependentCount, formatRelativeAge } from "../transforms";
@@ -14,7 +13,6 @@ import { todayIso } from "@/lib/dates";
 import type {
   CompanyDetail,
   CompanyUser,
-  EngagementEventType,
   CompanySegment,
 } from "@/lib/types/sales-intelligence";
 
@@ -214,12 +212,12 @@ export default function CompanyDetailPage() {
                     <th className="text-left px-4 py-2 font-medium">User</th>
                     <th className="text-left px-4 py-2 font-medium">Source</th>
                     <th className="text-left px-4 py-2 font-medium">Activity</th>
-                    <th className="text-right px-4 py-2 font-medium">Events</th>
+                    <th className="text-right px-4 py-2 font-medium">Entities</th>
                   </tr>
                 </thead>
                 <tbody>
                   {company.users
-                    .sort((a: CompanyUser, b: CompanyUser) => b.eventCount - a.eventCount)
+                    .sort((a: CompanyUser, b: CompanyUser) => b.engagements.length - a.engagements.length)
                     .map((user: CompanyUser) => (
                       <tr key={user.id} className="border-b last:border-0">
                         <td className="px-4 py-2">
@@ -255,10 +253,30 @@ export default function CompanyDetailPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-2">
-                          <EngagementBadges types={user.engagementTypes as EngagementEventType[]} />
+                          <div className="space-y-0.5">
+                            {user.engagements.map((e) => (
+                              <div key={e.entity} className="text-xs">
+                                <span className="font-medium">
+                                  {e.competitor ? `${e.competitor} — ` : ""}
+                                  {e.displayName || e.entity}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  {formatEngagementBreakdown(e)}
+                                  {e.competitor && " (competitor)"}
+                                  {e.lastAt && ` · ${formatRelativeAge(e.lastAt, todayIso())}`}
+                                </span>
+                              </div>
+                            ))}
+                            {user.engagements.length === 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                no engagement recorded
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-2 text-right text-muted-foreground">
-                          {user.eventCount}
+                          {user.engagements.length}
                         </td>
                       </tr>
                     ))}

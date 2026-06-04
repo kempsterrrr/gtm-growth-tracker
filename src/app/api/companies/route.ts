@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
-import { companies, companyScores } from "@/lib/db/schema";
+import {
+  companies,
+  companyScores,
+  trackedRepos,
+  trackedPackages,
+  companyCompetitorSignals,
+} from "@/lib/db/schema";
 import { sql, desc } from "drizzle-orm";
 import { daysAgoIso } from "@/lib/dates";
 import { deriveSegment } from "@/lib/segments";
@@ -51,6 +57,32 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .get();
 
+    // Entity labels with activity: per-repo score rows + depends-on packages.
+    const repoEntities = db
+      .select({
+        owner: trackedRepos.owner,
+        name: trackedRepos.name,
+      })
+      .from(companyScores)
+      .innerJoin(trackedRepos, sql`${companyScores.repoId} = ${trackedRepos.id}`)
+      .where(sql`${companyScores.companyId} = ${company.id} AND ${companyScores.repoId} IS NOT NULL`)
+      .groupBy(companyScores.repoId)
+      .all();
+    const pkgEntities = db
+      .select({ name: trackedPackages.name })
+      .from(companyCompetitorSignals)
+      .innerJoin(
+        trackedPackages,
+        sql`${companyCompetitorSignals.packageId} = ${trackedPackages.id}`
+      )
+      .where(sql`${companyCompetitorSignals.companyId} = ${company.id}`)
+      .groupBy(companyCompetitorSignals.packageId)
+      .all();
+    const activeEntities = [
+      ...repoEntities.map((r) => `${r.owner}/${r.name}`),
+      ...pkgEntities.map((p) => p.name),
+    ];
+
     summaries.push({
       id: company.id,
       name: company.name,
@@ -63,6 +95,7 @@ export async function GET(request: NextRequest) {
       segment: deriveSegment(ownScore, competitorScore),
       lastOwnEngagementAt: own?.lastEventDate ?? null,
       lastCompetitorEngagementAt: competitor?.lastEventDate ?? null,
+      activeEntities,
       userCount: own?.userCount || 0,
       starCount: own?.starCount || 0,
       forkCount: own?.forkCount || 0,

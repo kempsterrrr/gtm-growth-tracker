@@ -16,6 +16,8 @@ export type {
   CompanyDetail,
   CompanySegment,
   CompetitorAttributionRow,
+  EntityEngagement,
+  AffiliatedUser,
   FiredAlert,
   AlertRuleType,
 } from "./sales-intelligence";

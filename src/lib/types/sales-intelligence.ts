@@ -42,6 +42,10 @@ export interface CompanySummary {
    *  prospects, whose dependency is the liveness signal. */
   lastOwnEngagementAt: string | null;
   lastCompetitorEngagementAt: string | null;
+  /** Entity labels this company has activity on — per-repo score rows plus
+   *  depends-on packages. Drives the Companies entity filter (PRD #42); own
+   *  packages carry no company-level signal and never appear. */
+  activeEntities: string[];
   userCount: number;
   starCount: number;
   forkCount: number;
@@ -94,6 +98,23 @@ export interface CompetitorAttributionRow {
   commitCount: number;
 }
 
+/** One entity's worth of a user's engagement (PRD #42): which repo/package,
+ *  what they did there (raw counts, scoring-style type buckets), whether it's
+ *  a competitor's, and how recently. Replaces the old unscoped badge fields,
+ *  which summed events across all repos — competitors' included. */
+export interface EntityEngagement {
+  /** Repo as "owner/name"; package as registry name. */
+  entity: string;
+  displayName: string | null;
+  competitor: string | null;
+  starCount: number;
+  forkCount: number;
+  issueCount: number;
+  prCount: number;
+  commitCount: number;
+  lastAt: string | null;
+}
+
 export interface CompanyUser {
   id: number;
   login: string;
@@ -102,8 +123,8 @@ export interface CompanyUser {
   companyRaw: string | null;
   source: CompanySource;
   confidence: number;
-  engagementTypes: EngagementEventType[];
-  eventCount: number;
+  /** Per-entity breakdown, newest activity first. */
+  engagements: EntityEngagement[];
   /** Likely competitor employee (the competitor's name) — badged in the UI,
    *  excluded from competitor aggregates, never deleted. */
   competitorEmployee: string | null;

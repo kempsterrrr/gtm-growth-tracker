@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
-import type { CompanyDetail } from "@/lib/types/api";
+import type { CompanyDetail, EntityEngagement } from "@/lib/types/api";
+import { eventAnchorDate } from "@/lib/decay";
 import {
   companies, companyScores, githubUserCompanies, githubUsers, githubEngagementEvents, trackedRepos,
   companyCompetitorSignals, trackedPackages,
@@ -155,17 +156,54 @@ export async function GET(
       source: u.source,
     }));
 
-  // For each primary user, get their engagement types
+  // For each primary user, break engagement down per entity — provenance
+  // beats the old unscoped badge summary (PRD #42).
   const users = userLinks.map((u) => {
-    const events = db
+    const rows = db
       .select({
+        owner: trackedRepos.owner,
+        repoName: trackedRepos.name,
+        displayName: trackedRepos.displayName,
+        competitor: trackedRepos.competitor,
         eventType: githubEngagementEvents.eventType,
-        count: sql<number>`COUNT(*)`,
+        eventDate: githubEngagementEvents.eventDate,
+        collectedAt: githubEngagementEvents.collectedAt,
       })
       .from(githubEngagementEvents)
+      .innerJoin(trackedRepos, sql`${githubEngagementEvents.repoId} = ${trackedRepos.id}`)
       .where(sql`${githubEngagementEvents.userId} = ${u.userId}`)
-      .groupBy(githubEngagementEvents.eventType)
       .all();
+
+    const byEntity = new Map<string, EntityEngagement>();
+    for (const r of rows) {
+      const entity = `${r.owner}/${r.repoName}`;
+      let e = byEntity.get(entity);
+      if (!e) {
+        e = {
+          entity,
+          displayName: r.displayName,
+          competitor: r.competitor,
+          starCount: 0,
+          forkCount: 0,
+          issueCount: 0,
+          prCount: 0,
+          commitCount: 0,
+          lastAt: null,
+        };
+        byEntity.set(entity, e);
+      }
+      // Scoring-style type buckets (issue comments count as issues, reviews as PRs)
+      if (r.eventType === "star") e.starCount++;
+      else if (r.eventType === "fork") e.forkCount++;
+      else if (r.eventType === "issue" || r.eventType === "issue_comment") e.issueCount++;
+      else if (r.eventType === "pr" || r.eventType === "pr_review") e.prCount++;
+      else if (r.eventType === "commit") e.commitCount++;
+      const anchor = eventAnchorDate(r.eventDate, r.collectedAt);
+      if (!e.lastAt || anchor > e.lastAt) e.lastAt = anchor;
+    }
+    const engagements = [...byEntity.values()].sort((a, b) =>
+      (b.lastAt ?? "").localeCompare(a.lastAt ?? "")
+    );
 
     return {
       id: u.userId,
@@ -175,8 +213,7 @@ export async function GET(
       companyRaw: u.companyRaw,
       source: u.source,
       confidence: u.confidence,
-      engagementTypes: events.map((e) => e.eventType),
-      eventCount: events.reduce((s, e) => s + e.count, 0),
+      engagements,
       competitorEmployee: u.competitorEmployee,
       competitorEmployeeSource: u.competitorEmployeeSource,
     };
