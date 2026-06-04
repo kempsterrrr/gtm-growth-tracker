@@ -9,7 +9,7 @@ import {
   ENGAGEMENT_WEIGHTS, COMPETITOR_ENGAGEMENT_WEIGHTS, BREADTH_BONUS_PER_USER, MAX_EVENTS_PER_TYPE,
   DEPENDS_ON_WEIGHT,
 } from "../types/scoring";
-import { readConfig } from "../config/gtm-config";
+import { readConfig, resolveScoringKnobs, type GtmConfig } from "../config/gtm-config";
 import {
   decayMultiplier,
   eventAgeDays,
@@ -30,16 +30,16 @@ export interface ScoringKnobs {
   minAggregateScore?: number;
 }
 
-/** Configured competitor domains, gracefully empty without a config file
- *  (the config module stays the only YAML reader). */
-function loadCompetitorDomains(): string[] {
+/** Graceful config read (the config module stays the only YAML reader):
+ *  undefined when the file is missing or malformed — config-sync already
+ *  failed the run loudly in the malformed case; scoring degrades to defaults. */
+function loadConfigGracefully(): GtmConfig | undefined {
   const configPath = path.join(process.cwd(), "gtm-config.yaml");
-  if (!fs.existsSync(configPath)) return [];
+  if (!fs.existsSync(configPath)) return undefined;
   try {
-    const config = readConfig(configPath);
-    return Object.values(config.competitors ?? {}).flatMap((c) => c.domains);
+    return readConfig(configPath);
   } catch {
-    return []; // malformed config already failed config-sync; scoring degrades
+    return undefined;
   }
 }
 
@@ -62,9 +62,12 @@ const emptyTotals = (): ScopeTotals => ({
 });
 
 export async function scoreCompanies(knobs: ScoringKnobs = {}) {
-  const halfLife = knobs.halfLifeDays ?? DECAY_HALF_LIFE_DAYS;
-  const maxAge = knobs.maxAgeDays ?? DECAY_MAX_AGE_DAYS;
-  const minScore = knobs.minAggregateScore ?? MIN_AGGREGATE_SCORE;
+  const config = loadConfigGracefully();
+  // Explicit knobs (tests) > configured scoring block (Settings) > defaults.
+  const configured = resolveScoringKnobs(config?.scoring);
+  const halfLife = knobs.halfLifeDays ?? configured.halfLifeDays;
+  const maxAge = knobs.maxAgeDays ?? configured.maxAgeDays;
+  const minScore = knobs.minAggregateScore ?? configured.minAggregateScore;
   const db = getDb();
   const today = todayIso();
   const allCompanies = db.select().from(companies).all();
@@ -96,7 +99,9 @@ export async function scoreCompanies(knobs: ScoringKnobs = {}) {
     .where(sql`${trackedPackages.competitor} IS NOT NULL`)
     .all();
   for (const p of competitorPkgs) competitorNames.add(p.competitor!.toLowerCase());
-  const competitorDomains = new Set(loadCompetitorDomains());
+  const competitorDomains = new Set(
+    Object.values(config?.competitors ?? {}).flatMap((c) => c.domains)
+  );
   const isCompetitorCompany = (company: { name: string; domain: string | null }) =>
     competitorNames.has(company.name.toLowerCase()) ||
     (company.domain != null && competitorDomains.has(company.domain));
