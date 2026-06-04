@@ -339,6 +339,10 @@ export const githubUserCompanies = sqliteTable(
       enum: ["email_domain", "profile_company", "org_membership", "manual"],
     }).notNull(),
     confidence: real("confidence").notNull().default(0.5),
+    /** Exactly one link per user carries 1: the highest-confidence employer
+     *  (ties → first-discovered). Recomputed every resolution run; scoring
+     *  counts a user only at their primary company (PRD #42). */
+    isPrimary: integer("is_primary").notNull().default(0),
   },
   (table) => [
     unique("github_user_companies_unique").on(table.userId, table.companyId),

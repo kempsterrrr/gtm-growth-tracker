@@ -498,6 +498,23 @@ describe("schema equivalence (upgrade-path gate)", () => {
     db.close();
   });
 
+  it("the migrations add the primary-company flag", () => {
+    process.env.DATABASE_PATH = path.join(tmp, "primary.db");
+    runMigrations();
+    const db = new Database(process.env.DATABASE_PATH);
+    const col = (
+      db.prepare("PRAGMA table_info(github_user_companies)").all() as Array<{
+        name: string;
+        notnull: number;
+        dflt_value: string | null;
+      }>
+    )
+      .filter((c) => c.name === "is_primary")
+      .map((c) => ({ name: c.name, notnull: c.notnull, dflt: c.dflt_value }));
+    expect(col).toEqual([{ name: "is_primary", notnull: 1, dflt: "0" }]);
+    db.close();
+  });
+
   it("the migrations widen the alert rule-type check to the competitor rules", () => {
     process.env.DATABASE_PATH = path.join(tmp, "alert-types.db");
     runMigrations();

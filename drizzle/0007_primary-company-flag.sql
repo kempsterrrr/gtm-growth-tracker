@@ -1,0 +1,1 @@
+ALTER TABLE `github_user_companies` ADD `is_primary` integer DEFAULT 0 NOT NULL;
