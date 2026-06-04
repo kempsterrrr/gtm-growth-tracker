@@ -10,14 +10,7 @@ import {
   DEPENDS_ON_WEIGHT,
 } from "../types/scoring";
 import { readConfig, resolveScoringKnobs, type GtmConfig } from "../config/gtm-config";
-import {
-  decayMultiplier,
-  eventAgeDays,
-  eventAnchorDate,
-  DECAY_HALF_LIFE_DAYS,
-  DECAY_MAX_AGE_DAYS,
-  MIN_AGGREGATE_SCORE,
-} from "../decay";
+import { decayMultiplier, eventAgeDays, eventAnchorDate } from "../decay";
 import { sql } from "drizzle-orm";
 import type { EngagementEventType } from "../types/sales-intelligence";
 import { todayIso } from "../dates";
