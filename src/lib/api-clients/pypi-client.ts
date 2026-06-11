@@ -31,7 +31,9 @@ export interface PypiSystemData {
 }
 
 export async function getPypiOverallDownloads(pkg: string): Promise<PypiOverallData> {
-  const url = `${PYPISTATS_API_BASE}/packages/${encodeURIComponent(pkg)}/overall?mirrors=true`;
+  // mirrors=false → real installs only; mirror/CDN pulls are automated noise,
+  // not adoption signal (see pypi_downloads category_value "without_mirrors").
+  const url = `${PYPISTATS_API_BASE}/packages/${encodeURIComponent(pkg)}/overall?mirrors=false`;
   const resp = await fetch(url);
 
   if (!resp.ok) {

@@ -31,7 +31,7 @@ export async function getNpmRangeDownloads(
   const end = new Date(endDate);
 
   let chunkStart = new Date(start);
-  while (chunkStart < end) {
+  while (chunkStart <= end) {
     const chunkEnd = new Date(chunkStart);
     chunkEnd.setDate(chunkEnd.getDate() + 364);
     const actualEnd = chunkEnd > end ? end : chunkEnd;
