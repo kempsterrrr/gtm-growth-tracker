@@ -8,16 +8,50 @@ github:
     - owner: ardriveapp
       name: turbo-python-sdk
       display_name: Turbo SDK (Python)
+    - owner: ar-io
+      name: wayfinder
+      display_name: Wayfinder
+    - owner: ar-io
+      name: ar-io-node
+      display_name: AR.IO Node
+    - owner: ar-io
+      name: ar-io-sdk
+      display_name: AR.IO SDK
+    - owner: Irys-xyz
+      name: arweave
+      competitor: Irys
+    - owner: Irys-xyz
+      name: irys
+      competitor: Irys
+    - owner: Irys-xyz
+      name: arbundles
+      competitor: Irys
+    - owner: Irys-xyz
+      name: arweave-js-sdk
+      competitor: Irys
 packages:
   npm:
     - name: "@ardrive/turbo-sdk"
       display_name: Turbo SDK
       github_repo: ardriveapp/turbo-sdk
+    - name: "@ar.io/sdk"
+      display_name: AR.IO SDK
+      github_repo: ar-io/ar-io-sdk
+    - name: "@ar.io/wayfinder-core"
+      display_name: Wayfinder Core
+      github_repo: ar-io/wayfinder
+    - name: "@ar.io/wayfinder-react"
+      display_name: Wayfinder React
+      github_repo: ar-io/wayfinder
+    - name: "@irys/sdk"
+      competitor: Irys
   pypi:
     - name: turbo-sdk
       display_name: Turbo SDK (Python)
       github_repo: ardriveapp/turbo-python-sdk
-    - name: mlflow
-      display_name: mlflow
+scoring:
+  half_life_days: 90
+  max_age_days: 360
+  min_aggregate_score: 1
 collection:
   npm_backfill_from: 2024-01-01
